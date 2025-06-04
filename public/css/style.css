@@ -1,0 +1,1143 @@
+    /* 全体的なレイアウト */
+    body {
+      display: flex;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      height: 100vh;
+      position: relative;
+      background-color: #f5f5f5; /* デフォルトの背景色 */
+      overflow: hidden; /* Prevent body scroll, .grid-floor will scroll */
+    }
+
+    /* 印刷用フロアヘッダー（通常は非表示） */
+    #printFloorHeader {
+      display: none;
+    }
+
+    #floorDisplayContainer {
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 8px 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        z-index: 101; /* コントロールパネルより手前 */
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    #currentFloorName {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #333;
+    }
+    #switchFloorButton {
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    #switchFloorButton:hover {
+        background-color: #0056b3;
+    }
+
+    /* 右上コントロール群のコンテナ */
+    #topRightControlsContainer {
+        position: fixed;
+        top: 10px;
+        right: 20px;
+        z-index: 102;
+        display: flex;
+        flex-direction: column; /* モード切替と印刷設定を縦に並べる */
+        align-items: flex-end; /* 右寄せ */
+        gap: 10px; /* 各コントロール間の隙間 */
+    }
+
+    /* モード切替ボタンと印刷アイコングループのスタイル */
+    #modeSwitcher {
+        display: flex;
+        gap: 10px;
+    }
+    #modeSwitcher button, #togglePrintControlsBtn {
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        border-radius: 5px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        background-color: #f8f9fa;
+        transition: background-color 0.3s;
+        height: 36px; /* 他のボタンと高さを合わせる */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #modeSwitcher button:hover, #togglePrintControlsBtn:hover {
+        background-color: #e9ecef;
+    }
+    #enterAdminModeBtn {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: black;
+    }
+    #exitAdminModeBtn {
+        background-color: #28a745;
+        color: black;
+        border-color: #28a745;
+    }
+    #togglePrintControlsBtn {
+        width: 40px; /* アイコンボタンなので少し小さく */
+        padding: 6px;
+    }
+    #togglePrintControlsBtn i {
+        font-size: 1.1rem;
+    }
+
+
+    /* 印刷設定コントロールのスタイル */
+    #printControls {
+        display: none; /* 初期状態は非表示 */
+        background: rgba(255, 255, 255, 0.95);
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        flex-direction: column; /* display: flex; をJSで付与 */
+        gap: 8px;
+        width: auto; /* 内容に合わせる */
+        min-width: 180px; /* 最小幅 */
+    }
+    #printControls.active {
+        display: flex; /* 表示時はflexに */
+    }
+    #printControls p {
+        margin: 0 0 5px 0;
+        font-size: 0.9em;
+        font-weight: bold;
+        color: #333;
+    }
+    #printControls button {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        border-radius: 5px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        background-color: #f0f0f0;
+        transition: background-color 0.3s;
+        width: 100%; /* 親要素いっぱいに広げる */
+        box-sizing: border-box;
+    }
+    #printControls button:hover {
+        background-color: #e0e0e0;
+    }
+    #printControls .print-info {
+        font-size: 0.75em;
+        color: #555;
+        margin-top: 5px;
+    }
+
+
+    /* サイドパネルラッパーのスタイル */
+    .side-panel-wrapper {
+      width: 280px;
+      border-right: 1px solid #e0e0e0;
+      background: #ffffff;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+      border-radius: 0 8px 8px 0;
+      flex-shrink: 0;
+    }
+
+    .side-panel {
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .side-panel h2 {
+      margin-top: 0;
+      color: #333;
+      font-size: 1.3rem;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    #employeeFilterContainer {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        gap: 8px;
+    }
+    #departmentFilter {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        flex: 0 0 200px;
+        width: 200px;
+    }
+
+    #resetFilterBtn {
+        padding: 8px;
+        font-size: 1.2rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #555;
+    }
+    #resetFilterBtn:hover {
+        color: #000;
+    }
+
+    .employee-item {
+      padding: 10px 12px;
+      border: 1px solid #d0d0d0;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: grab;
+      background: #fdfdfd;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      color: #333;
+    }
+    .employee-item:hover {
+      border-color: #a0d9ff;
+      transform: translateY(-2px);
+    }
+    .employee-item.selected {
+      border-color: #007bff;
+      box-shadow: 0 2px 5px rgba(0,123,255,0.2);
+      font-weight: bold;
+    }
+
+    .grid-floor {
+      flex: 1;
+      display: grid;
+      grid-template-columns: min-content 1fr;
+      grid-template-rows: auto auto 1fr auto 1fr;
+      gap: 10px;
+      padding: 20px;
+      padding-top: 60px;
+      background: transparent;
+      overflow: auto;
+      border-radius: 8px;
+    }
+
+    .department-zone-header {
+        grid-column: 2 / 3;
+        display: grid;
+        gap: 1px;
+        margin-bottom: 5px;
+        height: 30px;
+    }
+    .department-zone-header.top-zone-header {
+        grid-row: 2 / 3;
+        margin-top: 0;
+    }
+    .department-zone-header.bottom-zone-header {
+        grid-row: 4 / 5;
+        margin-top: 30px;
+    }
+    .dept-zone-block {
+        background-color: #f0f0f0;
+        color: #333;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 0.8em;
+        font-weight: bold;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 0 5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        box-sizing: border-box;
+    }
+
+    .section-islands {
+      display: grid;
+      gap: 20px;
+      padding: 10px;
+      background-color: #fcfcfc;
+      border-radius: 10px;
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+      overflow-x: visible;
+      overflow-y: visible;
+      align-content: start;
+    }
+    .section-islands.finance-area-top {
+        grid-column: 2 / 3;
+        grid-row: 3 / 4;
+        grid-template-columns: repeat(11, minmax(175px, auto));
+    }
+    .section-islands.finance-area-bottom {
+        grid-column: 2 / 3;
+        grid-row: 5 / 6;
+        grid-template-columns: repeat(11, minmax(175px, auto));
+    }
+
+    .grid-island {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 8px;
+      outline: 1px dashed #b0b0b0;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease;
+      width: 175px;
+    }
+    .grid-island:hover { transform: translateY(-3px); }
+
+    /* 島（デスク）の上のキャビネット */
+    .island-cabinet {
+      /* background-color: #e0f7fa; */ /* ← 元の色 */
+      background-color: #E0E0E0; /* ← 新しい色に変更 (例: ライトグレー) */
+      /* 他のスタイルはそのまま */
+      width: 100%;
+      height: 40px;
+      border-radius: 8px;
+      padding: 3px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: row;
+      gap: 7px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .memo-section {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px dashed #a7d9e2;
+        border-radius: 6px;
+        overflow: hidden;
+        cursor: pointer;
+        /* border-color: #a7d9e2; */ /* キャビネットの色に合わせて調整 */
+        /* background-color: #f0faff; */ /* キャビネットの色に合わせて調整、または少し明るい色 */
+        border-color: #CFCFCF; /* 例: ライトグレーのキャビネットに合わせた境界線 */
+        background-color: #F0F0F0; /* 例: ライトグレーのキャビネットより少し明るい背景 */
+    }
+    .memo-display {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.75em;
+      color: #333;
+      padding: 0 3px;
+      font-weight: bold;
+    }
+    .memo-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 1px solid #007bff;
+      border-radius: 6px;
+      padding: 3px;
+      box-sizing: border-box;
+      resize: none;
+      font-size: 0.75em;
+      font-family: 'Inter', sans-serif;
+      background-color: #fff;
+    }
+    .side-cabinet .memo-display,
+    .top-cabinet-item .memo-display {
+        white-space: normal;
+        word-break: break-all;
+    }
+     .side-cabinet .memo-input,
+     .top-cabinet-item .memo-input {
+        white-space: normal;
+        word-break: break-all;
+    }
+
+    .island-seats-container {
+      display: grid;
+      grid-template-columns: repeat(2, 85px);
+      grid-template-rows: repeat(4, 100px);
+      gap: 5px;
+      flex-grow: 1;
+    }
+
+    .seat-cell {
+      position: relative;
+      border: 1px solid #c0c0c0;
+      border-radius: 8px;
+      box-sizing: border-box;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5px;
+      background: #fafafa;
+      transition: all 0.2s ease;
+      font-size: 0.85em;
+      color: #555;
+      text-align: center;
+    }
+    .seat-cell:hover { background: #e0f2f7; border-color: #81d4fa; }
+    .seat-cell.selected {
+      outline: 3px solid #007bff;
+      box-shadow: 0 0 10px rgba(0,123,255,0.4);
+      z-index: 10;
+    }
+    .seat-cell.merged-seat {
+      grid-column: span 2;
+      background: #ffe0b2 !important;
+      border-color: #ff9800;
+      box-shadow: 0 2px 5px rgba(255,152,0,0.2);
+    }
+    .merged-mark {
+      position: absolute;
+      left: 5px;
+      top: 5px;
+      background: #ffb74d;
+      color: #6d4c41;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 5px;
+      z-index: 2;
+      font-weight: bold;
+    }
+
+    .seat-card {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: space-around;
+      padding: 5px 2px;
+      font-size: 0.7em;
+      color: #333;
+      border-radius: 5px;
+      background-color: #eeeeee;
+    }
+    .seat-card div {
+        line-height: 1.3;
+        margin-bottom: 1px;
+        width: 100%;
+        overflow-wrap: break-word;
+    }
+    .seat-card strong { font-size: 0.9em; color: #000; }
+    .seat-card .employee-name {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #000;
+        margin-bottom: 2px;
+    }
+
+    .return-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      font-size: 0.7rem;
+      padding: 3px 6px;
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: none;
+      transition: background-color 0.3s ease;
+    }
+    .admin-mode .seat-cell.selected:has(.seat-card) .return-btn {
+        display: block;
+    }
+    .view-mode .seat-cell .return-btn {
+        display: none !important;
+    }
+
+    .controls-wrapper {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    #controlsToggleBtn {
+        width: 50px;
+        height: 50px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        font-size: 1.5rem; /* アイコンサイズに合わせて調整 */
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.3s, transform 0.3s;
+        margin-bottom: 10px;
+    }
+    #controlsToggleBtn:hover {
+        background-color: #0056b3;
+        transform: scale(1.1);
+    }
+    #controlsToggleBtn i { /* Font Awesome アイコンのサイズ調整 */
+        line-height: 1; /* 中央寄せのため */
+    }
+
+
+    .controls {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      background-color: rgba(255,255,255,0.95);
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+    }
+    .controls.active {
+        display: flex;
+    }
+
+    .controls .control-group {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+    .controls button {
+      width: auto;
+      min-width: 40px;
+      height: 40px;
+      font-size: 0.85rem;
+      padding: 0 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease, color 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .controls button:hover:not(.active-floor) {
+      filter: brightness(90%);
+      transform: translateY(-1px);
+    }
+    .controls #mergeBtn {
+      background-color: #6c757d;
+      color: white;
+      padding: 0;
+      width: 40px;
+      font-size: 1.5rem;
+      line-height: 40px;
+      text-align: center;
+    }
+    .controls #mergeBtn.active {
+      background: #007bff;
+      color: #fff;
+      border: 2px solid white;
+      box-shadow: none;
+    }
+    .controls #toggleListBtn { background-color: #607D8B; }
+    .controls #saveLocalBtn { background-color: #FF9800; }
+    .controls #loadLocalBtn { background-color: #795548; }
+    .controls #deptZoneSettingsBtn { background-color: #4CAF50; }
+
+    #feedbackMessage {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+      z-index: 101;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out, bottom 0.3s ease-in-out;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    #jsonInput {
+      margin-top: 20px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: calc(100% - 16px);
+    }
+
+    #topCabinet {
+      grid-column: 2 / 3;
+      grid-row: 1 / 2;
+      height: 40px;
+      background-color: transparent;
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0;
+      padding-left: 400px;
+      box-sizing: border-box;
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+
+    /* フロア上部のキャビネット */
+    .top-cabinet-item {
+      /* background-color: #c8e6c9; */ /* ← 元の色 */
+      background-color: #E0E0E0; /* ← 新しい色に変更 (例: ライトグレー) */
+      /* 他のスタイルはそのまま */
+      width: 90px;
+      height: 100%;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      display: flex;
+      padding: 3px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+
+    .top-cabinet-item .memo-section {
+        /* border-color: #a5d6a7; */
+        /* background-color: #e8f5e9; */
+        border-color: #CFCFCF;
+        background-color: #F0F0F0;
+    }
+
+    .side-cabinets-container {
+      grid-column: 1 / 2;
+      grid-row: 1 / span 5;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding-right: 10px;
+      align-items: flex-start;
+      overflow-y: hidden;
+      height: auto;
+      min-height: 500px;
+      margin-top: 30px;
+    }
+
+    /* フロア左側のキャビネット */
+    .side-cabinet {
+      /* background-color: #a7d9e2; */ /* ← 元の色 */
+      background-color: #E0E0E0; /* ← 新しい色に変更 (例: ライトグレー) */
+      /* 他のスタイルはそのまま */
+      width: 50px;
+      height: 70px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      padding: 3px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+      /* margin-bottom は sideCabinetsContainer の gap で制御するか、個別に設定 */
+    }
+
+    .cabinet-spacer {
+        height: 40px;
+        flex-shrink: 0;
+        width: 100%;
+        background-color: transparent;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 90%;
+        max-width: 700px;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+        padding: 10px 15px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .modal-header h2 { margin: 0; font-size: 1.5rem; }
+    .close-btn {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; }
+    .modal-body { padding: 15px; max-height: 60vh; overflow-y: auto;}
+    .modal-footer {
+        padding: 10px 15px;
+        border-top: 1px solid #eee;
+        text-align: right;
+    }
+    .modal-footer button { padding: 10px 15px; border-radius: 5px; cursor: pointer; }
+    .modal-footer .save-settings-btn { background-color: #4CAF50; color: white; border: none; margin-left:10px;}
+    .modal-footer .cancel-settings-btn { background-color: #f44336; color: white; border: none;}
+
+    .dept-zone-form-group { margin-bottom: 10px; }
+    .dept-zone-form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+    .dept-zone-form-group input[type="text"],
+    .dept-zone-form-group input[type="number"],
+    .dept-zone-form-group select,
+    .dept-zone-form-group input[type="color"] {
+        width: calc(100% - 12px);
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .dept-zone-form-group input[type="color"] { width: 100px; height: 35px; padding: 2px; }
+
+    .row-type-selector { display: flex; align-items: center; margin-bottom: 15px;}
+    .row-type-selector label { margin-right: 5px; margin-left: 10px; font-weight: normal;}
+    .row-type-selector input[type="radio"] { margin-right: 3px;}
+
+    .island-range-inputs { display: flex; gap: 10px; align-items: center; }
+    .island-range-inputs .dept-zone-form-group { flex: 1; margin-bottom: 0;}
+    .island-range-inputs label { white-space: nowrap; }
+
+    #currentDeptZonesList { list-style: none; padding: 0; }
+    #currentDeptZonesList li {
+        background-color: #f9f9f9;
+        border: 1px solid #eee;
+        padding: 10px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    #currentDeptZonesList .zone-info { flex-grow: 1; }
+    #currentDeptZonesList .zone-actions button { margin-left: 5px; padding: 5px 8px; font-size: 0.8em; }
+    .edit-zone-btn { background-color: #2196F3; color:white; border:none;}
+    .delete-zone-btn { background-color: #f44336; color:white; border:none;}
+
+    .view-mode .controls button:not(#switchFloorButton):not(#controlsToggleBtn),
+    .view-mode #jsonInput,
+    .view-mode .employee-item,
+    .view-mode .memo-input {
+        pointer-events: none;
+        opacity: 0.6;
+        cursor: not-allowed !important;
+    }
+    .view-mode .employee-item { cursor: default !important; }
+    .view-mode .memo-display { cursor: default !important; }
+    .view-mode .seat-cell:not(.merged-seat) { cursor: default !important; }
+    .view-mode #exitAdminModeBtn { display: none !important; }
+    .admin-mode #enterAdminModeBtn { display: none !important; }
+    .admin-mode #exitAdminModeBtn { display: inline-block !important; }
+
+    .section-islands.finance-area-top,
+    .section-islands.finance-area-bottom {
+        grid-template-columns: repeat(11, minmax(175px, auto));
+    }
+    .department-zone-header {
+        grid-template-columns: repeat(11, 1fr);
+    }
+
+    /* -------------------- 印刷専用 CSS -------------------- */
+    @media print {
+      /* html { zoom: 46%; } */
+
+      html.print-mode-a4 {
+        zoom: 46%;
+      }
+
+      html.print-mode-a3 {
+        zoom: 65%;
+      }
+
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        font-family: "Arial", "Meiryo", sans-serif !important;
+      }
+
+      *, *::before, *::after {
+        box-shadow: none !important;
+        text-shadow: none !important;
+        transition: none !important;
+        background-image: none !important;
+      }
+
+      #printFloorHeader {
+        display: block !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-size: 24pt;
+        font-weight: bold;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        z-index: 10000;
+      }
+
+    .seat-card {
+      color: #000 !important;
+      font-size: 10pt !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .seat-cell {
+      color: #000 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+      #topRightControlsContainer, /* 右上コントロール全体を非表示 */
+      .controls-wrapper,
+      #floorDisplayContainer,
+      .side-panel-wrapper,
+      #feedbackMessage {
+        display: none !important;
+      }
+
+      .grid-floor {
+        height: auto !important;
+        overflow: visible !important;
+        margin-top: 60px;
+      }
+
+      #sideCabinetsContainer {
+        margin-top: 150px;
+      }
+
+      .grid-island,
+      .seat-cell {
+        page-break-inside: avoid;
+      }
+
+      .island-seats-container {
+        grid-template-rows: repeat(4, 130px);
+      }
+
+      .seat-cell { overflow: hidden; }
+
+      .seat-card {
+        font-size: 8pt !important;
+        padding: 2px !important;
+        line-height: 1.15;
+      }
+
+      .seat-card .employee-name {
+        font-size: 1.2em !important;
+        font-weight: bold;
+      }
+    }
+
+/* 未配置社員リストのファイル読み込み機能を非表示にする */
+#jsonInput {
+  display: none !important; /* !important で確実に非表示にする (必要に応じて) */
+}
+
+/* 未配置社員アイテムのスタイル改善 */
+.employee-item {
+  padding: 12px 15px; /* パディングを少し調整 */
+  border: 1px solid #e0e0e0; /* 境界線を少し柔らかく */
+  border-radius: 8px;
+  margin-bottom: 10px; /*アイテム間のマージンを少し広げる*/
+  cursor: grab;
+  background-color: #ffffff; /* デフォルトの背景色を白に */
+  transition: all 0.25s ease-in-out;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.06); /* 少し影をつける */
+  color: #333;
+  font-size: 0.9rem; /* フォントサイズ調整 */
+  line-height: 1.4; /* 行の高さを調整 */
+  display: flex; /* アイコンなどを配置しやすくするため */
+  align-items: center; /*垂直方向中央揃え*/
+}
+
+.employee-item:hover {
+  border-color: #007bff; /* ホバー時に境界線の色を変更 */
+  background-color: #f8f9fa; /* ホバー時に背景色を少し変更 */
+  transform: translateY(-2px) scale(1.01); /* 少し浮き上がるようなエフェクト */
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.employee-item.selected {
+  border-color: #0056b3; /* 選択時の境界線をより濃く */
+  box-shadow: 0 3px 7px rgba(0, 86, 179, 0.25);
+  font-weight: 600; /* 選択時は少し太字に */
+  background-color: #e7f3ff; /* 選択時の背景色 */
+}
+
+/* (オプション) 未配置社員アイテムにアイコンを追加する場合のスタイル例 */
+/* HTML側で <i class="fas fa-user"></i> のような要素を追加する必要があります */
+.employee-item i.fa-user {
+  margin-right: 10px;
+  color: #555;
+}
+
+.employee-item.selected i.fa-user {
+  color: #64afff;
+}
+
+/* 社員リスト全体のコンテナのスタイル調整 (任意) */
+#employeeList {
+  padding: 20px; /* パディングを確保 */
+}
+
+#employeeList h2 {
+  font-size: 1.2rem; /* 見出しのフォントサイズ調整 */
+  color: #444;
+  margin-bottom: 20px; /* 見出しとリストの間のマージン */
+}
+
+/* 部署フィルタのスタイル調整 (任意) */
+#employeeFilterContainer {
+  margin-bottom: 20px; /* フィルタとリストの間のマージン */
+}
+#departmentFilter {
+  border-radius: 6px; /* 角を少し丸く */
+  padding: 10px; /* パディング調整 */
+  border: 1px solid #ced4da;
+  background-color: #fff;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.075);
+}
+#resetFilterBtn {
+  padding: 8px 10px; /* パディング調整 */
+  font-size: 1.1rem; /* アイコンサイズ調整 */
+  background-color: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  color: #555;
+  transition: background-color 0.2s;
+}
+#resetFilterBtn:hover {
+  background-color: #e9ecef;
+  color: #000;
+}
+
+#employeeList h2 {
+  font-size: 1.4rem; /* フォントサイズを少し大きく */
+  color: #2c3e50;  /* 濃いめの落ち着いた色に */
+  margin-bottom: 25px; /* 下の要素とのマージンを調整 */
+  padding-bottom: 10px; /* 下線を引くためのパディング */
+  border-bottom: 2px solid #2196F3; /* アクセントになる下線を追加 */
+  display: inline-block; /* 下線の幅を文字幅に合わせる */
+  letter-spacing: 1px; /* 文字間隔を少し広げる */
+  font-weight: 600; /* 少し太字に */
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.05); /* 微妙なテキストシャドウ */
+}
+
+/* (オプション) タイトルの前にアイコンを追加する場合 */
+/* HTML側で #employeeList h2 の前に <i class="fas fa-users"></i> のような要素を追加 */
+#employeeList h2 > i.fa-users { /* h2 の子要素としてアイコンがある場合 */
+  margin-right: 12px;
+  color: #2196F3; /* アイコンの色を下線と合わせる */
+  font-size: 1.3rem; /* アイコンサイズ調整 */
+}
+
+/* public/css/style.css または index.html の <style> タグ内に追加・修正 */
+
+/* コントロールボタンの共通スタイル（既存のものをベースに微調整） */
+.controls .control-group button {
+  min-width: 130px; /* ボタンの最小幅を少し広げて文字を見やすく */
+  height: 40px;
+  font-size: 0.85rem;
+  padding: 0 12px; /* パディングを少し調整 */
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent; /* 初期状態では境界線を見えにくくするか、色に応じて設定 */
+  font-weight: 500; /* 文字の太さを少し調整 */
+}
+
+.controls .control-group button i {
+  margin-right: 8px; /* アイコンと文字の間隔 */
+  font-size: 1em; /* アイコンサイズを文字サイズに合わせる */
+}
+
+.controls .control-group button:hover:not([disabled]) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.controls .control-group button:active:not([disabled]) {
+  transform: translateY(0px);
+  box-shadow: 0 2px 3px rgba(0,0,0,0.08);
+}
+
+.controls .control-group button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+
+/* --- 保存ボタンのスタイル --- */
+/* 下書き保存ボタン */
+#saveDraftBtn {
+  background-color: #2196F3; /* オレンジ系 (元の色) */
+  color: white;
+  border-color: #2196F3; /* 枠線も同色に */
+}
+#saveDraftBtn:hover:not([disabled]) {
+  background-color: #1976D2; /* 少し濃いオレンジ */
+  border-color: #1976D2;
+}
+
+/* サーバ保存ボタン */
+#saveServerBtn {
+  background-color: #2196F3; /* 緑系 (元々あった色に近い) */
+  color: white;
+  border-color: #2196F3;
+}
+#saveServerBtn:hover:not([disabled]) {
+  background-color: #1976D2; /* 少し濃い緑 */
+  border-color: #1976D2;
+}
+
+
+/* --- 読込ボタンのスタイル (アウトライン) --- */
+/* 共通の読込ボタンスタイル */
+#loadDraftBtn,
+#loadServerBtn {
+  background-color: #ffffff; /* 背景は白 */
+  /* border-width: 2px; */ /* 共通スタイルで設定済み */
+  /* border-style: solid; */ /* 共通スタイルで設定済み (必要なら) */
+}
+
+/* 下書き読込ボタン */
+#loadDraftBtn {
+  border-color: #2196F3; /* 茶色系 (元の色) */
+  color: #2196F3; /* 文字とアイコンの色を枠線の色と同じに */
+}
+#loadDraftBtn:hover:not([disabled]) {
+  background-color: #2196F3; /* ホバー時に背景を枠線の色に */
+  color: white; /* ホバー時に文字とアイコンの色を白に */
+}
+#loadDraftBtn:active:not([disabled]) {
+  background-color: #1976D2; /* クリック時はさらに濃い色 */
+  border-color: #1976D2;
+  color: white;
+}
+
+
+/* サーバ読込ボタン */
+#loadServerBtn {
+  border-color: #2196F3; /* 青系 (新しい提案色) */
+  color: #2196F3; /* 文字とアイコンの色を枠線の色と同じに */
+}
+#loadServerBtn:hover:not([disabled]) {
+  background-color: #2196F3; /* ホバー時に背景を枠線の色に */
+  color: white; /* ホバー時に文字とアイコンの色を白に */
+}
+#loadServerBtn:active:not([disabled]) {
+  background-color: #1976D2; /* クリック時はさらに濃い色 */
+  border-color: #1976D2;
+  color: white;
+}
+
+/* --- その他のボタンの色調整 --- */
+/* リスト表示ボタンと部署範囲設定ボタンの幅を調整 */
+.controls #toggleListBtn,
+.controls #deptZoneSettingsBtn {
+  min-width: 130px; /* ★他のテキスト付きボタンと最小幅を合わせる */
+  justify-content: flex-start; /* ★アイコンを左寄せ、テキストが続くようにする */
+  padding: 0 12px; /* ★共通のパディングを適用 */
+  /* width: auto; は min-width があれば不要な場合が多い */
+}
+
+/* テキストが表示されない問題の特定ボタンに対する明示的なスタイル */
+.controls #toggleListBtn span,
+.controls #deptZoneSettingsBtn span {
+    display: inline !important; /* テキスト(span)が確実に表示されるようにする */
+    /* color: white !important; */ /* 必要であれば文字色を強制的に指定 (ボタンのcolorを継承するはず) */
+}
+
+
+.controls #toggleListBtn { background-color: #607D8B; color: white; border-color: #607D8B;}
+.controls #toggleListBtn:hover:not([disabled]) { background-color: #546E7A; border-color: #546E7A;}
+
+.controls #deptZoneSettingsBtn { background-color: #4CAF50; color: white; border-color: #4CAF50;}
+.controls #deptZoneSettingsBtn:hover:not([disabled]) { background-color: #43A047; border-color: #43A047;}
+
+
+.controls #upBtn,
+.controls #leftBtn,
+.controls #downBtn,
+.controls #rightBtn,
+.controls #mergeBtn {
+  min-width: 40px;
+  padding: 0; /* パディングを0にし、justify-contentで中央揃え */
+  background-color: #9E9E9E;
+  color: white;
+  border-color: #9E9E9E;
+}
+.controls #upBtn:hover:not([disabled]),
+.controls #leftBtn:hover:not([disabled]),
+.controls #downBtn:hover:not([disabled]),
+.controls #rightBtn:hover:not([disabled]),
+.controls #mergeBtn:hover:not([disabled]) {
+  background-color: #757575;
+  border-color: #757575;
+}
+.controls #mergeBtn.active {
+  background: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
+/* アイコンのみ、またはアイコンが主要なボタンのアイコンマージン調整 */
+.controls #upBtn i,
+.controls #leftBtn i,
+.controls #downBtn i,
+.controls #rightBtn i,
+.controls #mergeBtn i {
+  margin-right: 0; /* 右マージンを削除して中央揃えを助ける */
+}

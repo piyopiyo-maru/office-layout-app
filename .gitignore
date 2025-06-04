@@ -1,0 +1,22 @@
+# Python キャッシュ
+__pycache__/
+*.py[cod]
+
+# Docker
+docker-compose.override.yml
+**/node_modules/
+**/build/
+**/dist/
+
+# 環境ファイル
+.env
+.env.local
+
+# ログ
+*.log
+
+# 設定など環境依存ファイル
+*.ini
+
+# 社員情報
+*.json
