@@ -23,18 +23,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     let teamColorDefaults = {}; // チームカラー (サーバから読み込む)
     let departmentColorDefaults = {}; // 部署カラー (サーバから読み込む)
 
-    const LS_KEY_DRAFT_LAYOUT = 'seating-layout-draft-multi-floor-zones-v1'; // 下書き保存用キー
+    const LS_KEY_DRAFT_LAYOUT = 'seating-layout-draft-multi-floor-zones-v2-csv'; // 下書き保存用キー(バージョンアップ)
     let currentAppMode = 'view'; // 'view' または 'admin'
     let currentLayoutVersion = null; // サーバから取得したレイアウトのバージョン
 
     let selectedEmpNo = null, selectedCell = null, mergeMode = false;
     let tempDepartmentZones = { topRow: [], bottomRow: [] }; // 部署範囲設定モーダル用の一時データ
-
-    // ドラッグ中の社員情報を保持する変数
-    let draggedEmployeeInfo = null; // { empNo: '社員番号', origin: 'unassigned' または 'seat-{isl}-{r}-{c}' }
-    let draggedElement = null; // ドラッグ中のDOM要素そのもの
-    let isDragging = false; // ドラッグ操作中かどうかのフラグ
-    let mousedownOnDraggable = null; // mousedownされたドラッグ可能要素を一時保持
 
     // --- DOM要素取得 ---
     const feedbackMessageDiv = document.getElementById('feedbackMessage');
@@ -44,7 +38,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const employeeListPanel = document.getElementById('employeeList');
     const departmentFilterSelect = document.getElementById('departmentFilter');
     const resetFilterBtn = document.getElementById('resetFilterBtn');
-    const jsonInput = document.getElementById('jsonInput'); // 社員情報JSONアップロード用
+
+    // ★ CSVアップロード関連のDOM要素
+    const employeeCsvInput = document.getElementById('employeeCsvInput');
+    const teamCsvInput = document.getElementById('teamCsvInput');
+    const deptCsvInput = document.getElementById('deptCsvInput');
+    const applyCsvBtn = document.getElementById('applyCsvBtn');
+
     const topCabinetDiv = document.getElementById('topCabinet');
     const sideCabinetsContainer = document.getElementById('sideCabinetsContainer');
 
@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- 初期化処理の順序 ---
+    // 1. 初期データの読み込み (社員情報、配色など)
     try {
         await loadInitialServerData();
     } catch (error) {
@@ -104,6 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
+    // 2. レイアウト情報の読み込み (サーバから)
     try {
         await loadLayoutFromServer(true);
     } catch (error) {
@@ -114,14 +116,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         switchFloor(currentFloorId, true);
     }
 
+    // 3. 各種イベントリスナー設定
     setupEventListeners();
-    setAppMode('view'); // ★★★ 初期ロード完了後、確実に閲覧モードのUI状態にする ★★★
 
+    // 4. アプリケーションモード設定
+    setAppMode('view');
 
     // --- 関数定義 ---
 
     async function loadInitialServerData() {
         try {
+            // ★ サーバーのエンドポイントは変更なし
             const response = await fetch('/api/initial-data');
             if (!response.ok) {
                 throw new Error(`サーバエラー (${response.status}): 初期データを取得できませんでした。`);
@@ -142,6 +147,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             throw error;
         }
     }
+
+    // ★ CSVをパースするヘルパー関数
+    /**
+     * CSVテキストを解析してオブジェクトに変換します。
+     * @param {string} csvText - CSV形式の文字列
+     * @param {boolean} isEmployeeData - 社員データ形式かどうか
+     * @returns {Object} 解析されたデータ
+     */
+    function parseCsvText(csvText, isEmployeeData = false) {
+        const lines = csvText.trim().split(/\r?\n/);
+        if (lines.length < 2) return {}; // ヘッダーとデータ行が必要
+
+        const header = lines[0].split(',').map(h => h.trim());
+        const data = isEmployeeData ? {} : {};
+
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim());
+            const rowObject = {};
+            header.forEach((key, index) => {
+                rowObject[key] = values[index];
+            });
+
+            if (isEmployeeData) {
+                if (rowObject.empNo) {
+                    data[rowObject.empNo] = rowObject;
+                }
+            } else {
+                if (rowObject.key) {
+                    data[rowObject.key] = rowObject.value;
+                }
+            }
+        }
+        return data;
+    }
+
 
     async function loadLayoutFromServer(isInitialLoad = false) {
         if (currentAppMode === 'view' && !isInitialLoad) {
@@ -405,7 +445,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderList(filterDept = "") {
         if (!employeeListPanel) return;
-        employeeListPanel.querySelectorAll('.employee-item').forEach(el => el.remove());
+        // 既存の社員リストとCSVアップローダー以外の要素を保持
+        const uploaderContainer = document.getElementById('csvUploaderContainer');
+        const h2 = employeeListPanel.querySelector('h2');
+        const filterContainer = document.getElementById('employeeFilterContainer');
+        
+        employeeListPanel.innerHTML = ''; // 一旦クリア
+        if(h2) employeeListPanel.appendChild(h2);
+        if(filterContainer) employeeListPanel.appendChild(filterContainer);
+
         let unassignedEmployees = getUnassignedList();
         if (filterDept) {
             unassignedEmployees = unassignedEmployees.filter(empNo => cardDB[empNo]?.dept === filterDept);
@@ -424,28 +472,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             div.appendChild(nameSpan);
             const teamColor = teamColorDefaults[info.team] || teamColorDefaults['unknown_team'] || '#ffffff';
             div.style.backgroundColor = teamColor;
-
-            if (currentAppMode === 'admin') {
-                div.draggable = true;
-                div.addEventListener('mousedown', handleMouseDownDraggable);
-                div.addEventListener('dragstart', handleDragStartEmployeeItem);
-                div.addEventListener('dragend', handleDragEnd);
-            } else {
-                div.draggable = false;
-                div.removeEventListener('mousedown', handleMouseDownDraggable);
-                div.removeEventListener('dragstart', handleDragStartEmployeeItem);
-                div.removeEventListener('dragend', handleDragEnd);
-            }
-
             div.onclick = () => {
-                if (currentAppMode === 'admin' && !isDragging) {
-                    selectEmployee(div, empNo);
-                }
+                if (currentAppMode === 'admin') selectEmployee(div, empNo);
             };
             employeeListPanel.appendChild(div);
         });
+
+        if(uploaderContainer) employeeListPanel.appendChild(uploaderContainer);
         updateUIBasedOnMode();
     }
+
 
     function populateDepartmentFilterDropdown() {
         if (!departmentFilterSelect) return;
@@ -459,8 +495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function selectEmployee(div, empNo) {
-        if (currentAppMode === 'view' || isDragging) return;
-
+        if (currentAppMode === 'view') return;
         if (selectedEmpNo === empNo) {
             div.classList.remove('selected');
             selectedEmpNo = null;
@@ -490,15 +525,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function createCard(empNo) {
         const info = cardDB[empNo];
-        const card = document.createElement('div');
-        card.className = 'seat-card';
-
         if (!info) {
+            const card = document.createElement('div');
+            card.className = 'seat-card';
             card.style.backgroundColor = teamColorDefaults['unknown_team'] || '#eeeeee';
             card.innerHTML = `<div><strong>${empNo}</strong></div><div>(社員情報なし)</div>`;
             return card;
         }
-
+        const card = document.createElement('div');
+        card.className = 'seat-card';
         card.dataset.empNo = empNo;
         const teamColor = teamColorDefaults[info.team] || teamColorDefaults['unknown_team'] || '#eeeeee';
         card.style.backgroundColor = teamColor;
@@ -513,19 +548,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         cardHTML += `<div>内線: ${info.ext || '-'}</div>`;
         cardHTML += `<div>Tel.: ${info.ctstage || '-'}</div>`;
         card.innerHTML = cardHTML;
-
-        if (currentAppMode === 'admin') {
-            card.draggable = true;
-            card.addEventListener('mousedown', handleMouseDownDraggable);
-            card.addEventListener('dragstart', handleDragStartSeatCard);
-            card.addEventListener('dragend', handleDragEnd);
-        } else {
-            card.draggable = false;
-            card.removeEventListener('mousedown', handleMouseDownDraggable);
-            card.removeEventListener('dragstart', handleDragStartSeatCard);
-            card.removeEventListener('dragend', handleDragEnd);
-        }
-
         const btn = document.createElement('button');
         btn.textContent = '戻す';
         btn.className = 'return-btn';
@@ -555,10 +577,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function onCellClick(cell) {
-        if (isDragging || mousedownOnDraggable) {
-            return;
-        }
-
         const isl = parseInt(cell.dataset.island, 10);
         const r = parseInt(cell.dataset.row, 10);
         const c = parseInt(cell.dataset.col, 10);
@@ -566,7 +584,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             showFeedbackMessage("エラー: 座席データが無効です。", true);
             return;
         }
-
         if (currentAppMode === 'view') {
             if (selectedCell === cell) {
                 cell.classList.remove('selected');
@@ -578,25 +595,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return;
         }
-
         if (mergeMode) {
             toggleMerge(isl, r, c);
-            return;
-        }
-
-        if (selectedEmpNo && seatMap[isl][r][c] === null) {
-            seatMap[isl][r][c] = selectedEmpNo;
-            if (allFloorData[currentFloorId] && allFloorData[currentFloorId].seatMap[isl] && allFloorData[currentFloorId].seatMap[isl][r]) {
-                allFloorData[currentFloorId].seatMap[isl][r][c] = selectedEmpNo;
-            }
-            employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
-            selectedEmpNo = null;
-            if (selectedCell) {
-                selectedCell.classList.remove('selected');
-                selectedCell = null;
-            }
-            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
-            renderFloor();
             return;
         }
 
@@ -611,6 +611,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
                 selectedEmpNo = null;
             }
+        }
+
+        if (selectedEmpNo && seatMap[isl][r][c] === null && selectedCell === cell) {
+            seatMap[isl][r][c] = selectedEmpNo;
+            if (allFloorData[currentFloorId] && allFloorData[currentFloorId].seatMap[isl] && allFloorData[currentFloorId].seatMap[isl][r]) {
+                allFloorData[currentFloorId].seatMap[isl][r][c] = selectedEmpNo;
+            }
+            selectedEmpNo = null;
+            employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
+            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+            renderFloor();
+            const newSelCell = document.querySelector(`.seat-cell[data-island="${isl}"][data-row="${r}"][data-col="${c}"]`);
+            if (newSelCell) {
+                newSelCell.classList.add('selected');
+                selectedCell = newSelCell;
+            }
+            return;
         }
     }
 
@@ -681,13 +698,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     cell.dataset.island = isl;
                     cell.dataset.row = r;
                     cell.dataset.col = c;
-
-                    if (currentAppMode === 'admin') {
-                        cell.addEventListener('dragover', handleDragOverSeat);
-                        cell.addEventListener('dragleave', handleDragLeaveSeat);
-                        cell.addEventListener('drop', handleDropOnSeat);
-                    }
-
                     if (selectedCell &&
                         parseInt(selectedCell.dataset.island, 10) === isl &&
                         parseInt(selectedCell.dataset.row, 10) === r &&
@@ -814,7 +824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (newMode !== 'view' && newMode !== 'admin') return;
         currentAppMode = newMode;
         document.body.className = currentAppMode + '-mode';
-        updateUIBasedOnMode(); // モード変更時にUI要素の状態を更新
+        updateUIBasedOnMode();
 
         if (newMode === 'view') {
             if (sidePanelWrapper) sidePanelWrapper.style.display = 'none';
@@ -823,7 +833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const textElement = toggleListBtn.querySelector('span');
                 if (iconElement) iconElement.className = 'fas fa-list';
                 if (textElement) textElement.textContent = 'リスト表示';
-                else if (iconElement) { // フォールバックとしてspanを生成
+                else if (iconElement) {
                     const newSpan = document.createElement('span');
                     newSpan.textContent = 'リスト表示';
                     iconElement.insertAdjacentElement('afterend', newSpan);
@@ -836,10 +846,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             deselectAll();
         }
-        // 管理モードに切り替えた場合、renderListとrenderFloorを呼び出して
-        // draggable属性やイベントリスナーが正しく設定されるようにする
-        renderFloor();
-        renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
     }
 
     function updateUIBasedOnMode() {
@@ -854,7 +860,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (printA4SetupBtn) printA4SetupBtn.disabled = true;
             if (printA3SetupBtn) printA3SetupBtn.disabled = true;
         }
-        if (jsonInput) jsonInput.disabled = !isAdminMode;
+        
+        // CSVアップロードUIの有効/無効化
+        if(employeeCsvInput) employeeCsvInput.disabled = !isAdminMode;
+        if(teamCsvInput) teamCsvInput.disabled = !isAdminMode;
+        if(deptCsvInput) deptCsvInput.disabled = !isAdminMode;
+        if(applyCsvBtn) applyCsvBtn.disabled = !isAdminMode;
+
         if (employeeListPanel) {
             employeeListPanel.querySelectorAll('.employee-item').forEach(item => {
                 item.style.cursor = isAdminMode ? 'grab' : 'default';
@@ -880,7 +892,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 mergeMode = false;
                 mergeBtn.classList.remove('active');
                 mergeBtn.textContent = '＋';
-                // renderFloor(); // ここで呼ぶと無限ループの可能性があったので削除
+                renderFloor();
             }
         }
         if (saveDeptZoneSettingsBtn) saveDeptZoneSettingsBtn.disabled = !isAdminMode;
@@ -1118,162 +1130,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (mergeMode && currentAppMode === 'view') {
              mergeMode = false;
         }
-        // console.log("すべての選択が解除されました。");
-    }
-
-    function handleMouseDownDraggable(event) {
-        if (currentAppMode !== 'admin') return;
-        mousedownOnDraggable = event.currentTarget; // mousedownされた要素を記録
-        // console.log('Mousedown on draggable:', mousedownOnDraggable);
-    }
-
-
-    function handleDragStartEmployeeItem(event) {
-        // mousedownされた要素とdragstartの要素が異なる場合、またはmousedownされていない場合はドラッグをキャンセル
-        if (currentAppMode !== 'admin' || event.currentTarget !== mousedownOnDraggable) {
-            event.preventDefault();
-            mousedownOnDraggable = null; // 念のためクリア
-            return;
-        }
-        isDragging = true;
-        const item = event.currentTarget;
-        const empNo = item.dataset.empNo;
-        console.log('Drag Start: Employee Item', empNo);
-
-        draggedEmployeeInfo = { empNo: empNo, origin: 'unassigned' };
-        draggedElement = item;
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', empNo);
-        setTimeout(() => {
-            if(draggedElement) draggedElement.classList.add('dragging');
-        }, 0);
-        mousedownOnDraggable = null; // dragstart が処理されたらクリア
-    }
-
-    function handleDragStartSeatCard(event) {
-        // mousedownされた要素とdragstartの要素が異なる場合、またはmousedownされていない場合はドラッグをキャンセル
-        if (currentAppMode !== 'admin' || event.currentTarget !== mousedownOnDraggable) {
-            event.preventDefault();
-            mousedownOnDraggable = null; // 念のためクリア
-            return;
-        }
-        event.stopPropagation(); // 親要素へのイベント伝播を停止
-        isDragging = true;
-
-        const card = event.currentTarget;
-        const empNo = card.dataset.empNo;
-        const cell = card.closest('.seat-cell');
-        if (!cell) {
-            isDragging = false;
-            mousedownOnDraggable = null; // エラーケースでもクリア
-            return;
-        }
-
-        console.log('Drag Start: Seat Card', empNo, 'from cell:', cell.dataset.island, cell.dataset.row, cell.dataset.col);
-
-        const isl = parseInt(cell.dataset.island, 10);
-        const r = parseInt(cell.dataset.row, 10);
-        const c = parseInt(cell.dataset.col, 10);
-
-        draggedEmployeeInfo = { empNo: empNo, origin: `seat-${isl}-${r}-${c}`, island: isl, row: r, col: c };
-        draggedElement = card;
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', empNo);
-        setTimeout(() => {
-            if(draggedElement) draggedElement.classList.add('dragging');
-        },0);
-        mousedownOnDraggable = null; // dragstart が処理されたらクリア
-    }
-
-    function handleDragEnd(event) {
-        console.log('Drag End. Drop effect:', event.dataTransfer.dropEffect);
-        if (draggedElement) {
-            draggedElement.classList.remove('dragging');
-        }
-        isDragging = false;
-        mousedownOnDraggable = null;
-        draggedEmployeeInfo = null;
-        draggedElement = null;
-        document.querySelectorAll('.seat-cell.dragover').forEach(cell => cell.classList.remove('dragover'));
-        deselectAll();
-    }
-
-    function handleDragOverSeat(event) {
-        if (currentAppMode !== 'admin' || !draggedEmployeeInfo) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        this.classList.add('dragover');
-    }
-
-    function handleDragLeaveSeat(event) {
-        if (currentAppMode !== 'admin') return;
-        this.classList.remove('dragover');
-    }
-
-    function handleDropOnSeat(event) {
-        if (currentAppMode !== 'admin' || !draggedEmployeeInfo) return;
-        event.preventDefault();
-        console.log('Drop on Seat', this.dataset.island, this.dataset.row, this.dataset.col);
-        this.classList.remove('dragover');
-
-        const targetCell = this;
-        const targetIsl = parseInt(targetCell.dataset.island, 10);
-        const targetRow = parseInt(targetCell.dataset.row, 10);
-        const targetCol = parseInt(targetCell.dataset.col, 10);
-
-        const { empNo: draggedEmpNo, origin, island: originIsl, row: originRow, col: originCol } = draggedEmployeeInfo;
-
-        if (origin !== 'unassigned' && originIsl === targetIsl && originRow === targetRow && originCol === targetCol) {
-            console.log("自分自身へのドロップは無視");
-            return;
-        }
-
-        if (mergedSeats.some(ms => ms.island === targetIsl && ms.row === targetRow && ms.col === targetCol -1)) {
-             showFeedbackMessage("結合された席の右側には直接配置できません。左側のセルにドロップしてください。", true);
-             return;
-        }
-
-        const targetSeatCurrentEmpNo = seatMap[targetIsl][targetRow][targetCol];
-        let operationSuccess = false;
-
-        if (origin === 'unassigned') {
-            if (targetSeatCurrentEmpNo === null) {
-                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
-                operationSuccess = true;
-            } else {
-                showFeedbackMessage("ドロップ先の席は既に使われています。", true);
-            }
-        } else {
-            if (targetSeatCurrentEmpNo === null) {
-                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
-                seatMap[originIsl][originRow][originCol] = null;
-                operationSuccess = true;
-            } else {
-                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
-                seatMap[originIsl][originRow][originCol] = targetSeatCurrentEmpNo;
-                operationSuccess = true;
-            }
-        }
-
-        if (operationSuccess) {
-            if(allFloorData[currentFloorId]) {
-                allFloorData[currentFloorId].seatMap = JSON.parse(JSON.stringify(seatMap));
-            }
-            showFeedbackMessage(`${cardDB[draggedEmpNo]?.name || draggedEmpNo} さんを移動しました。`, false);
-            renderFloor();
-            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
-            deselectAll();
-        }
+        console.log("すべての選択が解除されました。");
     }
 
 
     function setupEventListeners() {
-        document.addEventListener('mouseup', () => {
-            // console.log('Global mouseup, mousedownOnDraggable reset');
-            mousedownOnDraggable = null;
-        });
-
-
         if (switchFloorButton) switchFloorButton.onclick = () => switchFloor(switchFloorButton.dataset.targetFloor);
         if (controlsToggleBtn && controlsPanel) {
             controlsToggleBtn.onclick = () => {
@@ -1342,58 +1203,66 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderList();
             };
         }
-        if (jsonInput) {
-            jsonInput.addEventListener('change', (event) => {
+
+        // ★★★ CSVファイルアップロードのイベントリスナー ★★★
+        if(applyCsvBtn) {
+            applyCsvBtn.onclick = async () => {
                 if (currentAppMode === 'view') {
-                    showFeedbackMessage("閲覧モードではJSONを読み込めません。", true);
-                    event.target.value = '';
+                    showFeedbackMessage("閲覧モードではCSVを読み込めません。", true);
                     return;
                 }
-                const file = event.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const jsonData = JSON.parse(e.target.result);
-                            let newEmployeeData = null;
-                            if (jsonData.employeeData && typeof jsonData.employeeData === 'object' && !Array.isArray(jsonData.employeeData)) {
-                                newEmployeeData = jsonData.employeeData;
-                            } else if (jsonData.cardDB && typeof jsonData.cardDB === 'object') {
-                                newEmployeeData = jsonData.cardDB;
-                            } else if (Array.isArray(jsonData.employeeData)) {
-                                const empObject = {};
-                                jsonData.employeeData.forEach(emp => { if(emp?.empNo) empObject[emp.empNo] = emp; });
-                                newEmployeeData = empObject;
-                            } else if (Array.isArray(jsonData)) {
-                                const empObject = {};
-                                jsonData.forEach(emp => { if(emp?.empNo) empObject[emp.empNo] = emp; });
-                                newEmployeeData = empObject;
-                            }
-                            if (newEmployeeData) {
-                                cardDB = newEmployeeData;
-                            } else {
-                                console.warn("JSONに有効な社員データ (employeeDataオブジェクトまたは配列) が見つかりません。");
-                            }
-                            if (jsonData.teamColors && typeof jsonData.teamColors === 'object') {
-                                Object.assign(teamColorDefaults, jsonData.teamColors);
-                            }
-                            if (jsonData.departmentColors && typeof jsonData.departmentColors === 'object') {
-                                Object.assign(departmentColorDefaults, jsonData.departmentColors);
-                            }
-                            populateDepartmentDropdown();
-                            populateDepartmentFilterDropdown();
-                            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
-                            showFeedbackMessage(`社員情報と配色設定をJSONから読み込みました。変更を永続化するにはサーバ保存または下書き保存を行ってください。`, false);
-                        } catch (error) {
-                            console.error("JSONファイルの読み込み/パースエラー:", error);
-                            showFeedbackMessage("JSONファイルの読み込みに失敗しました。形式を確認してください。", true);
-                        }
-                        event.target.value = '';
-                    };
-                    reader.readAsText(file);
+                try {
+                    let updated = false;
+                    // 各ファイルを非同期で読み込み、パースして適用
+                    const employeeFile = employeeCsvInput.files[0];
+                    if (employeeFile) {
+                        const text = await employeeFile.text();
+                        cardDB = parseCsvText(text, true);
+                        console.log("社員情報をCSVから更新しました。");
+                        updated = true;
+                    }
+
+                    const teamFile = teamCsvInput.files[0];
+                    if (teamFile) {
+                        const text = await teamFile.text();
+                        teamColorDefaults = parseCsvText(text);
+                        console.log("チームカラーをCSVから更新しました。");
+                        updated = true;
+                    }
+
+                    const deptFile = deptCsvInput.files[0];
+                    if (deptFile) {
+                        const text = await deptFile.text();
+                        departmentColorDefaults = parseCsvText(text);
+                        console.log("部署カラーをCSVから更新しました。");
+                        updated = true;
+                    }
+                    
+                    if(updated) {
+                        // データが更新されたらUIを再描画
+                        populateDepartmentDropdown();
+                        populateDepartmentFilterDropdown();
+                        renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+                        renderFloor();
+                        renderDepartmentZoneHeaders();
+                        showFeedbackMessage("選択されたCSVファイルからデータを適用しました。", false);
+                    } else {
+                        showFeedbackMessage("適用するCSVファイルが選択されていません。", false);
+                    }
+
+                } catch (error) {
+                    console.error("CSVファイルの読み込み/パースエラー:", error);
+                    showFeedbackMessage("CSVファイルの処理中にエラーが発生しました。", true);
+                } finally {
+                    // ファイル選択をリセット
+                    employeeCsvInput.value = '';
+                    teamCsvInput.value = '';
+                    deptCsvInput.value = '';
                 }
-            });
+            };
         }
+
+
         if (closeDeptZoneModalBtn) closeDeptZoneModalBtn.onclick = () => { if (deptZoneModal) deptZoneModal.style.display = "none"; };
         if (cancelDeptZoneSettingsBtn) cancelDeptZoneSettingsBtn.onclick = () => { if (deptZoneModal) deptZoneModal.style.display = "none"; };
         window.onclick = (event) => { if (event.target == deptZoneModal) deptZoneModal.style.display = "none"; };
@@ -1453,4 +1322,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         window.addEventListener('beforeprint', updatePrintHeader);
     }
-});
+}); // DOMContentLoaded の終わり
