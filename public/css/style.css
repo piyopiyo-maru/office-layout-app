@@ -1141,3 +1141,16 @@
 .controls #mergeBtn i {
   margin-right: 0; /* 右マージンを削除して中央揃えを助ける */
 }
+
+/* style.css に追加 */
+.employee-item.dragging,
+.seat-card.dragging {
+    opacity: 0.5;
+    border: 2px dashed #007bff;
+}
+
+.seat-cell.dragover {
+    background-color: #e0f2f7 !important; /* ドロップ可能な場所のハイライト */
+    border-style: dashed !important;
+    border-color: #007bff !important;
+}

@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     let selectedEmpNo = null, selectedCell = null, mergeMode = false;
     let tempDepartmentZones = { topRow: [], bottomRow: [] }; // 部署範囲設定モーダル用の一時データ
 
+    // ドラッグ中の社員情報を保持する変数
+    let draggedEmployeeInfo = null; // { empNo: '社員番号', origin: 'unassigned' または 'seat-{isl}-{r}-{c}' }
+    let draggedElement = null; // ドラッグ中のDOM要素そのもの
+    let isDragging = false; // ドラッグ操作中かどうかのフラグ
+    let mousedownOnDraggable = null; // mousedownされたドラッグ可能要素を一時保持
+
     // --- DOM要素取得 ---
     const feedbackMessageDiv = document.getElementById('feedbackMessage');
     const currentFloorNameDisplay = document.getElementById('currentFloorName');
@@ -90,7 +96,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- 初期化処理の順序 ---
-    // 1. 初期データの読み込み (社員情報、配色など)
     try {
         await loadInitialServerData();
     } catch (error) {
@@ -99,7 +104,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // 2. レイアウト情報の読み込み (サーバから)
     try {
         await loadLayoutFromServer(true);
     } catch (error) {
@@ -110,11 +114,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         switchFloor(currentFloorId, true);
     }
 
-    // 3. 各種イベントリスナー設定
     setupEventListeners();
+    setAppMode('view'); // ★★★ 初期ロード完了後、確実に閲覧モードのUI状態にする ★★★
 
-    // 4. アプリケーションモード設定
-    setAppMode('view');
 
     // --- 関数定義 ---
 
@@ -218,8 +220,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentLayoutVersion = result._newVersion;
                 showFeedbackMessage(`レイアウトをサーバに保存しました (新バージョン: ${currentLayoutVersion})`, false);
                 console.log("レイアウトをサーバに保存しました。");
-                // サーバ保存成功時に下書きにも保存する場合 (任意)
-                // saveDraftToLocal();
             } else if (response.status === 409) {
                 showFeedbackMessage("競合が発生しました。最新のレイアウトを読み込みます。", true);
                 await loadLayoutFromServer(true);
@@ -424,8 +424,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             div.appendChild(nameSpan);
             const teamColor = teamColorDefaults[info.team] || teamColorDefaults['unknown_team'] || '#ffffff';
             div.style.backgroundColor = teamColor;
+
+            if (currentAppMode === 'admin') {
+                div.draggable = true;
+                div.addEventListener('mousedown', handleMouseDownDraggable);
+                div.addEventListener('dragstart', handleDragStartEmployeeItem);
+                div.addEventListener('dragend', handleDragEnd);
+            } else {
+                div.draggable = false;
+                div.removeEventListener('mousedown', handleMouseDownDraggable);
+                div.removeEventListener('dragstart', handleDragStartEmployeeItem);
+                div.removeEventListener('dragend', handleDragEnd);
+            }
+
             div.onclick = () => {
-                if (currentAppMode === 'admin') selectEmployee(div, empNo);
+                if (currentAppMode === 'admin' && !isDragging) {
+                    selectEmployee(div, empNo);
+                }
             };
             employeeListPanel.appendChild(div);
         });
@@ -444,18 +459,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function selectEmployee(div, empNo) {
-        if (currentAppMode === 'view') return;
-        // 既に選択されている社員と同じ社員をクリックした場合は選択を解除
+        if (currentAppMode === 'view' || isDragging) return;
+
         if (selectedEmpNo === empNo) {
             div.classList.remove('selected');
             selectedEmpNo = null;
         } else {
-            // 他の社員が選択されていれば解除
             employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
-            // 新しい社員を選択
             div.classList.add('selected');
             selectedEmpNo = empNo;
-            // 座席の選択も解除
             if (selectedCell) {
                 selectedCell.classList.remove('selected');
                 selectedCell = null;
@@ -478,15 +490,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function createCard(empNo) {
         const info = cardDB[empNo];
+        const card = document.createElement('div');
+        card.className = 'seat-card';
+
         if (!info) {
-            const card = document.createElement('div');
-            card.className = 'seat-card';
             card.style.backgroundColor = teamColorDefaults['unknown_team'] || '#eeeeee';
             card.innerHTML = `<div><strong>${empNo}</strong></div><div>(社員情報なし)</div>`;
             return card;
         }
-        const card = document.createElement('div');
-        card.className = 'seat-card';
+
         card.dataset.empNo = empNo;
         const teamColor = teamColorDefaults[info.team] || teamColorDefaults['unknown_team'] || '#eeeeee';
         card.style.backgroundColor = teamColor;
@@ -501,6 +513,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         cardHTML += `<div>内線: ${info.ext || '-'}</div>`;
         cardHTML += `<div>Tel.: ${info.ctstage || '-'}</div>`;
         card.innerHTML = cardHTML;
+
+        if (currentAppMode === 'admin') {
+            card.draggable = true;
+            card.addEventListener('mousedown', handleMouseDownDraggable);
+            card.addEventListener('dragstart', handleDragStartSeatCard);
+            card.addEventListener('dragend', handleDragEnd);
+        } else {
+            card.draggable = false;
+            card.removeEventListener('mousedown', handleMouseDownDraggable);
+            card.removeEventListener('dragstart', handleDragStartSeatCard);
+            card.removeEventListener('dragend', handleDragEnd);
+        }
+
         const btn = document.createElement('button');
         btn.textContent = '戻す';
         btn.className = 'return-btn';
@@ -530,6 +555,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function onCellClick(cell) {
+        if (isDragging || mousedownOnDraggable) {
+            return;
+        }
+
         const isl = parseInt(cell.dataset.island, 10);
         const r = parseInt(cell.dataset.row, 10);
         const c = parseInt(cell.dataset.col, 10);
@@ -538,55 +567,50 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // 閲覧モードの場合、選択状態の変更のみ許可
         if (currentAppMode === 'view') {
-            if (selectedCell === cell) { // 同じセルをクリックしたら選択解除
+            if (selectedCell === cell) {
                 cell.classList.remove('selected');
                 selectedCell = null;
-            } else { // 異なるセルをクリック
-                if (selectedCell) selectedCell.classList.remove('selected'); // 前の選択を解除
+            } else {
+                if (selectedCell) selectedCell.classList.remove('selected');
                 cell.classList.add('selected');
                 selectedCell = cell;
-                // 閲覧モードでは社員リストの選択は操作できない想定なので、解除処理は不要
             }
-            return; // 閲覧モードではこれ以上の処理は行わない
+            return;
         }
 
-        // 以下は admin モードの処理
         if (mergeMode) {
             toggleMerge(isl, r, c);
             return;
         }
 
-        if (selectedCell === cell) { // 同じセルをクリックしたら選択解除
-            cell.classList.remove('selected');
-            selectedCell = null;
-        } else { // 異なるセルをクリック
-            if (selectedCell) selectedCell.classList.remove('selected'); // 前の選択を解除
-            cell.classList.add('selected');
-            selectedCell = cell;
-            // 社員リストの選択も解除
-            if (selectedEmpNo) {
-                employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
-                selectedEmpNo = null;
-            }
-        }
-
-        if (selectedEmpNo && seatMap[isl][r][c] === null && selectedCell === cell) {
+        if (selectedEmpNo && seatMap[isl][r][c] === null) {
             seatMap[isl][r][c] = selectedEmpNo;
             if (allFloorData[currentFloorId] && allFloorData[currentFloorId].seatMap[isl] && allFloorData[currentFloorId].seatMap[isl][r]) {
                 allFloorData[currentFloorId].seatMap[isl][r][c] = selectedEmpNo;
             }
-            selectedEmpNo = null;
             employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
+            selectedEmpNo = null;
+            if (selectedCell) {
+                selectedCell.classList.remove('selected');
+                selectedCell = null;
+            }
             renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
             renderFloor();
-            const newSelCell = document.querySelector(`.seat-cell[data-island="${isl}"][data-row="${r}"][data-col="${c}"]`);
-            if (newSelCell) {
-                newSelCell.classList.add('selected');
-                selectedCell = newSelCell;
-            }
             return;
+        }
+
+        if (selectedCell === cell) {
+            cell.classList.remove('selected');
+            selectedCell = null;
+        } else {
+            if (selectedCell) selectedCell.classList.remove('selected');
+            cell.classList.add('selected');
+            selectedCell = cell;
+            if (selectedEmpNo) {
+                employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
+                selectedEmpNo = null;
+            }
         }
     }
 
@@ -657,6 +681,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     cell.dataset.island = isl;
                     cell.dataset.row = r;
                     cell.dataset.col = c;
+
+                    if (currentAppMode === 'admin') {
+                        cell.addEventListener('dragover', handleDragOverSeat);
+                        cell.addEventListener('dragleave', handleDragLeaveSeat);
+                        cell.addEventListener('drop', handleDropOnSeat);
+                    }
+
                     if (selectedCell &&
                         parseInt(selectedCell.dataset.island, 10) === isl &&
                         parseInt(selectedCell.dataset.row, 10) === r &&
@@ -783,7 +814,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (newMode !== 'view' && newMode !== 'admin') return;
         currentAppMode = newMode;
         document.body.className = currentAppMode + '-mode';
-        updateUIBasedOnMode();
+        updateUIBasedOnMode(); // モード変更時にUI要素の状態を更新
 
         if (newMode === 'view') {
             if (sidePanelWrapper) sidePanelWrapper.style.display = 'none';
@@ -792,7 +823,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const textElement = toggleListBtn.querySelector('span');
                 if (iconElement) iconElement.className = 'fas fa-list';
                 if (textElement) textElement.textContent = 'リスト表示';
-                else if (iconElement) {
+                else if (iconElement) { // フォールバックとしてspanを生成
                     const newSpan = document.createElement('span');
                     newSpan.textContent = 'リスト表示';
                     iconElement.insertAdjacentElement('afterend', newSpan);
@@ -803,9 +834,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 controlsPanel.classList.remove('active');
                 if (controlsToggleBtn) controlsToggleBtn.innerHTML = '<i class="fa-solid fa-gear"></i>';
             }
-            // 閲覧モードに切り替わった際に、念のため選択を解除
             deselectAll();
         }
+        // 管理モードに切り替えた場合、renderListとrenderFloorを呼び出して
+        // draggable属性やイベントリスナーが正しく設定されるようにする
+        renderFloor();
+        renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
     }
 
     function updateUIBasedOnMode() {
@@ -846,7 +880,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 mergeMode = false;
                 mergeBtn.classList.remove('active');
                 mergeBtn.textContent = '＋';
-                renderFloor();
+                // renderFloor(); // ここで呼ぶと無限ループの可能性があったので削除
             }
         }
         if (saveDeptZoneSettingsBtn) saveDeptZoneSettingsBtn.disabled = !isAdminMode;
@@ -1074,8 +1108,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
             selectedEmpNo = null;
         }
-        // 結合モードも解除 (閲覧モードでは通常発生しないが、念のため)
-        if (mergeMode && currentAppMode === 'admin') { // 管理モードの場合のみ結合モード解除をUIに反映
+        if (mergeMode && currentAppMode === 'admin') {
             mergeMode = false;
             if (mergeBtn) {
                 mergeBtn.classList.remove('active');
@@ -1083,13 +1116,164 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             renderFloor();
         } else if (mergeMode && currentAppMode === 'view') {
-             mergeMode = false; // 内部的な状態だけリセット
+             mergeMode = false;
         }
-        console.log("すべての選択が解除されました。");
+        // console.log("すべての選択が解除されました。");
+    }
+
+    function handleMouseDownDraggable(event) {
+        if (currentAppMode !== 'admin') return;
+        mousedownOnDraggable = event.currentTarget; // mousedownされた要素を記録
+        // console.log('Mousedown on draggable:', mousedownOnDraggable);
+    }
+
+
+    function handleDragStartEmployeeItem(event) {
+        // mousedownされた要素とdragstartの要素が異なる場合、またはmousedownされていない場合はドラッグをキャンセル
+        if (currentAppMode !== 'admin' || event.currentTarget !== mousedownOnDraggable) {
+            event.preventDefault();
+            mousedownOnDraggable = null; // 念のためクリア
+            return;
+        }
+        isDragging = true;
+        const item = event.currentTarget;
+        const empNo = item.dataset.empNo;
+        console.log('Drag Start: Employee Item', empNo);
+
+        draggedEmployeeInfo = { empNo: empNo, origin: 'unassigned' };
+        draggedElement = item;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', empNo);
+        setTimeout(() => {
+            if(draggedElement) draggedElement.classList.add('dragging');
+        }, 0);
+        mousedownOnDraggable = null; // dragstart が処理されたらクリア
+    }
+
+    function handleDragStartSeatCard(event) {
+        // mousedownされた要素とdragstartの要素が異なる場合、またはmousedownされていない場合はドラッグをキャンセル
+        if (currentAppMode !== 'admin' || event.currentTarget !== mousedownOnDraggable) {
+            event.preventDefault();
+            mousedownOnDraggable = null; // 念のためクリア
+            return;
+        }
+        event.stopPropagation(); // 親要素へのイベント伝播を停止
+        isDragging = true;
+
+        const card = event.currentTarget;
+        const empNo = card.dataset.empNo;
+        const cell = card.closest('.seat-cell');
+        if (!cell) {
+            isDragging = false;
+            mousedownOnDraggable = null; // エラーケースでもクリア
+            return;
+        }
+
+        console.log('Drag Start: Seat Card', empNo, 'from cell:', cell.dataset.island, cell.dataset.row, cell.dataset.col);
+
+        const isl = parseInt(cell.dataset.island, 10);
+        const r = parseInt(cell.dataset.row, 10);
+        const c = parseInt(cell.dataset.col, 10);
+
+        draggedEmployeeInfo = { empNo: empNo, origin: `seat-${isl}-${r}-${c}`, island: isl, row: r, col: c };
+        draggedElement = card;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', empNo);
+        setTimeout(() => {
+            if(draggedElement) draggedElement.classList.add('dragging');
+        },0);
+        mousedownOnDraggable = null; // dragstart が処理されたらクリア
+    }
+
+    function handleDragEnd(event) {
+        console.log('Drag End. Drop effect:', event.dataTransfer.dropEffect);
+        if (draggedElement) {
+            draggedElement.classList.remove('dragging');
+        }
+        isDragging = false;
+        mousedownOnDraggable = null;
+        draggedEmployeeInfo = null;
+        draggedElement = null;
+        document.querySelectorAll('.seat-cell.dragover').forEach(cell => cell.classList.remove('dragover'));
+        deselectAll();
+    }
+
+    function handleDragOverSeat(event) {
+        if (currentAppMode !== 'admin' || !draggedEmployeeInfo) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        this.classList.add('dragover');
+    }
+
+    function handleDragLeaveSeat(event) {
+        if (currentAppMode !== 'admin') return;
+        this.classList.remove('dragover');
+    }
+
+    function handleDropOnSeat(event) {
+        if (currentAppMode !== 'admin' || !draggedEmployeeInfo) return;
+        event.preventDefault();
+        console.log('Drop on Seat', this.dataset.island, this.dataset.row, this.dataset.col);
+        this.classList.remove('dragover');
+
+        const targetCell = this;
+        const targetIsl = parseInt(targetCell.dataset.island, 10);
+        const targetRow = parseInt(targetCell.dataset.row, 10);
+        const targetCol = parseInt(targetCell.dataset.col, 10);
+
+        const { empNo: draggedEmpNo, origin, island: originIsl, row: originRow, col: originCol } = draggedEmployeeInfo;
+
+        if (origin !== 'unassigned' && originIsl === targetIsl && originRow === targetRow && originCol === targetCol) {
+            console.log("自分自身へのドロップは無視");
+            return;
+        }
+
+        if (mergedSeats.some(ms => ms.island === targetIsl && ms.row === targetRow && ms.col === targetCol -1)) {
+             showFeedbackMessage("結合された席の右側には直接配置できません。左側のセルにドロップしてください。", true);
+             return;
+        }
+
+        const targetSeatCurrentEmpNo = seatMap[targetIsl][targetRow][targetCol];
+        let operationSuccess = false;
+
+        if (origin === 'unassigned') {
+            if (targetSeatCurrentEmpNo === null) {
+                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
+                operationSuccess = true;
+            } else {
+                showFeedbackMessage("ドロップ先の席は既に使われています。", true);
+            }
+        } else {
+            if (targetSeatCurrentEmpNo === null) {
+                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
+                seatMap[originIsl][originRow][originCol] = null;
+                operationSuccess = true;
+            } else {
+                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
+                seatMap[originIsl][originRow][originCol] = targetSeatCurrentEmpNo;
+                operationSuccess = true;
+            }
+        }
+
+        if (operationSuccess) {
+            if(allFloorData[currentFloorId]) {
+                allFloorData[currentFloorId].seatMap = JSON.parse(JSON.stringify(seatMap));
+            }
+            showFeedbackMessage(`${cardDB[draggedEmpNo]?.name || draggedEmpNo} さんを移動しました。`, false);
+            renderFloor();
+            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+            deselectAll();
+        }
     }
 
 
     function setupEventListeners() {
+        document.addEventListener('mouseup', () => {
+            // console.log('Global mouseup, mousedownOnDraggable reset');
+            mousedownOnDraggable = null;
+        });
+
+
         if (switchFloorButton) switchFloorButton.onclick = () => switchFloor(switchFloorButton.dataset.targetFloor);
         if (controlsToggleBtn && controlsPanel) {
             controlsToggleBtn.onclick = () => {
@@ -1220,31 +1404,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (saveDeptZoneSettingsBtn) saveDeptZoneSettingsBtn.onclick = saveDeptZoneSettingsHandler;
 
         document.addEventListener('keydown', e => {
-            // モーダル表示中はESCキーのグローバルな選択解除を無効化 (モーダルを閉じる処理は優先)
             if (deptZoneModal && deptZoneModal.style.display === "block") {
                 if (e.key === 'Escape') {
                     deptZoneModal.style.display = "none";
-                    e.preventDefault(); // 他のESCキーイベントとの競合を防ぐ
-                }
-                return; // モーダル表示中は他のキー操作をブロック
-            }
-
-            // 入力フィールドがアクティブな場合のESCキー処理
-            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-                if (e.key === 'Escape') {
-                    deselectAll(); // 閲覧モード・管理モード共通で選択解除
-                    document.activeElement.blur(); // フォーカスも外す
                     e.preventDefault();
                 }
-                return; // ESCキー以外は入力フィールドのデフォルト動作を妨げない
+                return;
             }
 
-            // ESCキーによる選択解除 (閲覧モード・管理モード共通)
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+                if (e.key === 'Escape') {
+                    deselectAll();
+                    document.activeElement.blur();
+                    e.preventDefault();
+                }
+                return;
+            }
+
             if (e.key === 'Escape') {
                 deselectAll();
                 e.preventDefault();
             }
-            // 矢印キーによる移動 (管理モード限定)
             else if (currentAppMode === 'admin' && e.key.startsWith('Arrow') && selectedCell) {
                 moveSelected(e.key.replace('Arrow', '').toLowerCase());
                 e.preventDefault();
@@ -1273,4 +1453,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         window.addEventListener('beforeprint', updatePrintHeader);
     }
-}); // DOMContentLoaded の終わり
+});
