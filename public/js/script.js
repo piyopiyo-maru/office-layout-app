@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loadDraftBtn = document.getElementById('loadDraftBtn');
     const saveServerBtn = document.getElementById('saveServerBtn');
     const loadServerBtn = document.getElementById('loadServerBtn');
+    const refreshInitialDataBtn = document.getElementById('refreshInitialDataBtn'); // ★★★ 追加 ★★★
 
     // モード切替ボタン
     const enterAdminModeBtn = document.getElementById('enterAdminModeBtn');
@@ -97,7 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 初期化処理の順序 ---
     try {
-        await loadInitialServerData();
+        await loadInitialServerData(true); // isInitialLoad を true に
     } catch (error) {
         console.error("致命的エラー: 初期データのロードに失敗しました。", error);
         showFeedbackMessage("アプリケーションの起動に必要な基本データを読み込めませんでした。管理者に連絡してください。", true);
@@ -120,7 +121,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 関数定義 ---
 
-    async function loadInitialServerData() {
+    // ★★★ 修正 ★★★
+    // isInitialLoad引数を追加し、初回ロード時のみフル描画、それ以外は確認後に描画するように変更
+    async function loadInitialServerData(isInitialLoad = false) {
         try {
             const response = await fetch('/api/initial-data');
             if (!response.ok) {
@@ -130,18 +133,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             cardDB = data.employeeData || {};
             teamColorDefaults = data.teamColors || {};
             departmentColorDefaults = data.departmentColors || {};
+
+            // 関連UIの更新
             populateDepartmentDropdown();
             populateDepartmentFilterDropdown();
-            console.log("初期データをサーバから読み込みました。");
+            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+            renderFloor();
+
+            console.log("初期データをサーバから読み込み、UIを更新しました。");
         } catch (error) {
             console.error("初期データの読み込みに失敗しました:", error);
             showFeedbackMessage("サーバから基本データの読み込みに失敗しました。一部機能が正しく動作しない可能性があります。", true);
-            cardDB = {};
-            teamColorDefaults = {};
-            departmentColorDefaults = {};
-            throw error;
+            throw error; // エラーを呼び出し元に伝える
         }
     }
+
 
     async function loadLayoutFromServer(isInitialLoad = false) {
         if (currentAppMode === 'view' && !isInitialLoad) {
@@ -842,6 +848,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
     }
 
+    // ★★★ 修正 ★★★
     function updateUIBasedOnMode() {
         const isAdminMode = currentAppMode === 'admin';
         if (enterAdminModeBtn) enterAdminModeBtn.style.display = isAdminMode ? 'none' : '';
@@ -860,9 +867,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 item.style.cursor = isAdminMode ? 'grab' : 'default';
             });
         }
+        // refreshInitialDataBtn をリストに追加
         [toggleListBtn, deptZoneSettingsBtn, upBtn, leftBtn, downBtn, rightBtn, mergeBtn,
-         saveDraftBtn, loadDraftBtn, saveServerBtn, loadServerBtn]
+         saveDraftBtn, loadDraftBtn, saveServerBtn, loadServerBtn, refreshInitialDataBtn]
             .forEach(btn => { if (btn) btn.disabled = !isAdminMode; });
+
         document.querySelectorAll('.memo-input').forEach(input => {
             input.disabled = !isAdminMode;
             if (!isAdminMode && input.style.display !== 'none') {
@@ -1267,6 +1276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
 
+    // ★★★ 修正 ★★★
     function setupEventListeners() {
         document.addEventListener('mouseup', () => {
             // console.log('Global mouseup, mousedownOnDraggable reset');
@@ -1402,6 +1412,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (deptZoneNameSelect) deptZoneNameSelect.addEventListener('change', handleDeptZoneNameChangeForColor);
         if (addOrUpdateDeptZoneBtn) addOrUpdateDeptZoneBtn.onclick = addOrUpdateDeptZoneHandler;
         if (saveDeptZoneSettingsBtn) saveDeptZoneSettingsBtn.onclick = saveDeptZoneSettingsHandler;
+
+        // refreshInitialDataBtn のイベントリスナーを追加
+        if (refreshInitialDataBtn) {
+            refreshInitialDataBtn.onclick = async () => {
+                if (currentAppMode !== 'admin') {
+                    showFeedbackMessage("閲覧モードではマスターデータを再読み込みできません。", true);
+                    return;
+                }
+                if (confirm("サーバーから最新の社員マスター情報（社員名、部署、チームカラーなど）を再読み込みします。よろしいですか？\n※現在の座席配置は維持されます。")) {
+                    try {
+                        showFeedbackMessage("社員マスター情報を再読み込み中...", false);
+                        await loadInitialServerData();
+                        showFeedbackMessage("社員マスター情報を正常に再読み込みしました。", false);
+                    } catch (error) {
+                        showFeedbackMessage("社員マスター情報の再読み込みに失敗しました。", true);
+                    }
+                }
+            };
+        }
 
         document.addEventListener('keydown', e => {
             if (deptZoneModal && deptZoneModal.style.display === "block") {
