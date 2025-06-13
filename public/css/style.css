@@ -64,7 +64,9 @@
         display: flex;
         gap: 10px;
     }
-    #modeSwitcher button, #togglePrintControlsBtn {
+    /* ▼▼▼ 変更箇所 ▼▼▼ */
+    #modeSwitcher button, #togglePrintControlsBtn, #toggleMasterControlsBtn {
+    /* ▲▲▲ 変更箇所 ▲▲▲ */
         padding: 6px 12px;
         font-size: 0.9rem;
         border-radius: 5px;
@@ -77,7 +79,9 @@
         align-items: center;
         justify-content: center;
     }
-    #modeSwitcher button:hover, #togglePrintControlsBtn:hover {
+    /* ▼▼▼ 変更箇所 ▼▼▼ */
+    #modeSwitcher button:hover, #togglePrintControlsBtn:hover, #toggleMasterControlsBtn:hover {
+    /* ▲▲▲ 変更箇所 ▲▲▲ */
         background-color: #e9ecef;
     }
     #enterAdminModeBtn {
@@ -90,11 +94,15 @@
         color: black;
         border-color: #28a745;
     }
-    #togglePrintControlsBtn {
+    /* ▼▼▼ 変更箇所 ▼▼▼ */
+    #togglePrintControlsBtn, #toggleMasterControlsBtn {
+    /* ▲▲▲ 変更箇所 ▲▲▲ */
         width: 40px; /* アイコンボタンなので少し小さく */
         padding: 6px;
     }
-    #togglePrintControlsBtn i {
+    /* ▼▼▼ 変更箇所 ▼▼▼ */
+    #togglePrintControlsBtn i, #toggleMasterControlsBtn i {
+    /* ▲▲▲ 変更箇所 ▲▲▲ */
         font-size: 1.1rem;
     }
 
@@ -139,6 +147,62 @@
         color: #555;
         margin-top: 5px;
     }
+
+    /* ▼▼▼ 変更箇所 ▼▼▼ */
+    /* マスターデータ管理コントロールのスタイル */
+    #masterControls {
+        display: none; /* 初期状態は非表示 */
+        background: rgba(255, 255, 255, 0.95);
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        flex-direction: column;
+        gap: 8px;
+        width: auto;
+        min-width: 220px;
+    }
+    #masterControls.active {
+        display: flex;
+    }
+    #masterControls p {
+        margin: 0 0 5px 0;
+        font-size: 0.9em;
+        font-weight: bold;
+        color: #333;
+    }
+    #masterControls button, #masterControls .btn-like-label {
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        border-radius: 5px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        background-color: #f0f0f0;
+        transition: background-color 0.3s;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    #masterControls button:hover, #masterControls .btn-like-label:hover {
+        background-color: #e0e0e0;
+    }
+    #masterControls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background-color: #e9ecef;
+    }
+    #selectedFileName {
+        font-size: 0.75em;
+        color: #555;
+        margin-top: -5px;
+        margin-bottom: 5px;
+        text-align: center;
+        word-break: break-all;
+    }
+    /* ▲▲▲ 変更箇所 ▲▲▲ */
 
 
     /* サイドパネルラッパーのスタイル */
@@ -464,7 +528,7 @@
       border-radius: 5px;
       cursor: pointer;
       display: none;
-      transition: background-color 0.3s ease;
+      transition: background-color: 0.3s ease;
     }
     .admin-mode .seat-cell.selected:has(.seat-card) .return-btn {
         display: block;

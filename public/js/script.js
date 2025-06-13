@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let selectedEmpNo = null, selectedCell = null, mergeMode = false;
     let tempDepartmentZones = { topRow: [], bottomRow: [] }; // 部署範囲設定モーダル用の一時データ
+    let loadedMasterData = null; // ファイルから読み込んだマスターデータの一時保管場所
 
     // ドラッグ中の社員情報を保持する変数
     let draggedEmployeeInfo = null; // { empNo: '社員番号', origin: 'unassigned' または 'seat-{isl}-{r}-{c}' }
@@ -62,7 +63,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loadDraftBtn = document.getElementById('loadDraftBtn');
     const saveServerBtn = document.getElementById('saveServerBtn');
     const loadServerBtn = document.getElementById('loadServerBtn');
-    const refreshInitialDataBtn = document.getElementById('refreshInitialDataBtn'); // ★★★ 追加 ★★★
+    
+    // ▼▼▼ 変更箇所 ▼▼▼
+    // const refreshInitialDataBtn = document.getElementById('refreshInitialDataBtn'); // 削除
+    // ▲▲▲ 変更箇所 ▲▲▲
 
     // モード切替ボタン
     const enterAdminModeBtn = document.getElementById('enterAdminModeBtn');
@@ -76,6 +80,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const printA3SetupBtn = document.getElementById('printA3SetupBtn');
     const printFloorHeader = document.getElementById('printFloorHeader');
 
+    // マスターデータ管理関連
+    const toggleMasterControlsBtn = document.getElementById('toggleMasterControlsBtn');
+    const masterControlsDiv = document.getElementById('masterControls');
+    const masterJsonInput = document.getElementById('masterJsonInput');
+    const selectedFileNameSpan = document.getElementById('selectedFileName');
+    const loadMasterJsonBtn = document.getElementById('loadMasterJsonBtn');
+    const saveMasterJsonBtn = document.getElementById('saveMasterJsonBtn');
+    const reloadMasterDataBtn = document.getElementById('reloadMasterDataBtn');
 
     // 部署範囲設定モーダル関連
     const deptZoneModal = document.getElementById('deptZoneModal');
@@ -120,11 +132,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- 関数定義 ---
-
-    // ★★★ 修正 ★★★
-    // isInitialLoad引数を追加し、初回ロード時のみフル描画、それ以外は確認後に描画するように変更
     async function loadInitialServerData(isInitialLoad = false) {
+        if (!isInitialLoad && !confirm("サーバーから最新の社員マスター情報を再読み込みします。よろしいですか？\n※現在の座席配置は維持されます。")) {
+            return;
+        }
         try {
+            if (!isInitialLoad) showFeedbackMessage("社員マスター情報を再読み込み中...", false);
             const response = await fetch('/api/initial-data');
             if (!response.ok) {
                 throw new Error(`サーバエラー (${response.status}): 初期データを取得できませんでした。`);
@@ -140,6 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
             renderFloor();
 
+            if (!isInitialLoad) showFeedbackMessage("社員マスター情報を正常に再読み込みしました。", false);
             console.log("初期データをサーバから読み込み、UIを更新しました。");
         } catch (error) {
             console.error("初期データの読み込みに失敗しました:", error);
@@ -848,29 +862,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
     }
 
-    // ★★★ 修正 ★★★
     function updateUIBasedOnMode() {
         const isAdminMode = currentAppMode === 'admin';
-        if (enterAdminModeBtn) enterAdminModeBtn.style.display = isAdminMode ? 'none' : '';
-        if (exitAdminModeBtn) exitAdminModeBtn.style.display = isAdminMode ? '' : 'none';
+        if (enterAdminModeBtn) enterAdminModeBtn.style.display = isAdminMode ? 'none' : 'flex';
+        if (exitAdminModeBtn) exitAdminModeBtn.style.display = isAdminMode ? 'flex' : 'none';
+
         if (togglePrintControlsBtn) togglePrintControlsBtn.disabled = false;
-        if (printControlsDiv && printControlsDiv.classList.contains('active')) {
-            if (printA4SetupBtn) printA4SetupBtn.disabled = false;
-            if (printA3SetupBtn) printA3SetupBtn.disabled = false;
-        } else {
-            if (printA4SetupBtn) printA4SetupBtn.disabled = true;
-            if (printA3SetupBtn) printA3SetupBtn.disabled = true;
+        if (printControlsDiv) {
+            const isActive = printControlsDiv.classList.contains('active');
+            if (printA4SetupBtn) printA4SetupBtn.disabled = !isActive;
+            if (printA3SetupBtn) printA3SetupBtn.disabled = !isActive;
         }
+
+        if (toggleMasterControlsBtn) toggleMasterControlsBtn.disabled = !isAdminMode;
+        if (masterControlsDiv) {
+            if (!isAdminMode && masterControlsDiv.classList.contains('active')) {
+                masterControlsDiv.classList.remove('active');
+            }
+            [loadMasterJsonBtn, saveMasterJsonBtn, reloadMasterDataBtn].forEach(btn => {
+                if (btn) btn.disabled = !isAdminMode;
+            });
+            if (loadMasterJsonBtn) loadMasterJsonBtn.disabled = !isAdminMode || !loadedMasterData;
+            if (saveMasterJsonBtn) saveMasterJsonBtn.disabled = !isAdminMode || !loadedMasterData;
+        }
+
         if (jsonInput) jsonInput.disabled = !isAdminMode;
         if (employeeListPanel) {
             employeeListPanel.querySelectorAll('.employee-item').forEach(item => {
                 item.style.cursor = isAdminMode ? 'grab' : 'default';
             });
         }
-        // refreshInitialDataBtn をリストに追加
+        // ▼▼▼ 変更箇所 ▼▼▼
         [toggleListBtn, deptZoneSettingsBtn, upBtn, leftBtn, downBtn, rightBtn, mergeBtn,
-         saveDraftBtn, loadDraftBtn, saveServerBtn, loadServerBtn, refreshInitialDataBtn]
+         saveDraftBtn, loadDraftBtn, saveServerBtn, loadServerBtn]
             .forEach(btn => { if (btn) btn.disabled = !isAdminMode; });
+        // ▲▲▲ 変更箇所 ▲▲▲
 
         document.querySelectorAll('.memo-input').forEach(input => {
             input.disabled = !isAdminMode;
@@ -889,7 +915,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 mergeMode = false;
                 mergeBtn.classList.remove('active');
                 mergeBtn.textContent = '＋';
-                // renderFloor(); // ここで呼ぶと無限ループの可能性があったので削除
             }
         }
         if (saveDeptZoneSettingsBtn) saveDeptZoneSettingsBtn.disabled = !isAdminMode;
@@ -1127,28 +1152,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (mergeMode && currentAppMode === 'view') {
              mergeMode = false;
         }
-        // console.log("すべての選択が解除されました。");
     }
 
     function handleMouseDownDraggable(event) {
         if (currentAppMode !== 'admin') return;
-        mousedownOnDraggable = event.currentTarget; // mousedownされた要素を記録
-        // console.log('Mousedown on draggable:', mousedownOnDraggable);
+        mousedownOnDraggable = event.currentTarget;
     }
 
 
     function handleDragStartEmployeeItem(event) {
-        // mousedownされた要素とdragstartの要素が異なる場合、またはmousedownされていない場合はドラッグをキャンセル
         if (currentAppMode !== 'admin' || event.currentTarget !== mousedownOnDraggable) {
             event.preventDefault();
-            mousedownOnDraggable = null; // 念のためクリア
+            mousedownOnDraggable = null;
             return;
         }
         isDragging = true;
         const item = event.currentTarget;
         const empNo = item.dataset.empNo;
-        console.log('Drag Start: Employee Item', empNo);
-
         draggedEmployeeInfo = { empNo: empNo, origin: 'unassigned' };
         draggedElement = item;
         event.dataTransfer.effectAllowed = 'move';
@@ -1156,17 +1176,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
             if(draggedElement) draggedElement.classList.add('dragging');
         }, 0);
-        mousedownOnDraggable = null; // dragstart が処理されたらクリア
+        mousedownOnDraggable = null;
     }
 
     function handleDragStartSeatCard(event) {
-        // mousedownされた要素とdragstartの要素が異なる場合、またはmousedownされていない場合はドラッグをキャンセル
         if (currentAppMode !== 'admin' || event.currentTarget !== mousedownOnDraggable) {
             event.preventDefault();
-            mousedownOnDraggable = null; // 念のためクリア
+            mousedownOnDraggable = null;
             return;
         }
-        event.stopPropagation(); // 親要素へのイベント伝播を停止
+        event.stopPropagation();
         isDragging = true;
 
         const card = event.currentTarget;
@@ -1174,12 +1193,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cell = card.closest('.seat-cell');
         if (!cell) {
             isDragging = false;
-            mousedownOnDraggable = null; // エラーケースでもクリア
+            mousedownOnDraggable = null;
             return;
         }
-
-        console.log('Drag Start: Seat Card', empNo, 'from cell:', cell.dataset.island, cell.dataset.row, cell.dataset.col);
-
         const isl = parseInt(cell.dataset.island, 10);
         const r = parseInt(cell.dataset.row, 10);
         const c = parseInt(cell.dataset.col, 10);
@@ -1191,11 +1207,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
             if(draggedElement) draggedElement.classList.add('dragging');
         },0);
-        mousedownOnDraggable = null; // dragstart が処理されたらクリア
+        mousedownOnDraggable = null;
     }
 
     function handleDragEnd(event) {
-        console.log('Drag End. Drop effect:', event.dataTransfer.dropEffect);
         if (draggedElement) {
             draggedElement.classList.remove('dragging');
         }
@@ -1222,7 +1237,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function handleDropOnSeat(event) {
         if (currentAppMode !== 'admin' || !draggedEmployeeInfo) return;
         event.preventDefault();
-        console.log('Drop on Seat', this.dataset.island, this.dataset.row, this.dataset.col);
         this.classList.remove('dragover');
 
         const targetCell = this;
@@ -1233,7 +1247,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { empNo: draggedEmpNo, origin, island: originIsl, row: originRow, col: originCol } = draggedEmployeeInfo;
 
         if (origin !== 'unassigned' && originIsl === targetIsl && originRow === targetRow && originCol === targetCol) {
-            console.log("自分自身へのドロップは無視");
             return;
         }
 
@@ -1276,15 +1289,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
 
-    // ★★★ 修正 ★★★
     function setupEventListeners() {
         document.addEventListener('mouseup', () => {
-            // console.log('Global mouseup, mousedownOnDraggable reset');
             mousedownOnDraggable = null;
         });
 
-
         if (switchFloorButton) switchFloorButton.onclick = () => switchFloor(switchFloorButton.dataset.targetFloor);
+
         if (controlsToggleBtn && controlsPanel) {
             controlsToggleBtn.onclick = () => {
                 const isActive = controlsPanel.classList.toggle('active');
@@ -1352,58 +1363,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderList();
             };
         }
-        if (jsonInput) {
-            jsonInput.addEventListener('change', (event) => {
-                if (currentAppMode === 'view') {
-                    showFeedbackMessage("閲覧モードではJSONを読み込めません。", true);
-                    event.target.value = '';
-                    return;
-                }
-                const file = event.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const jsonData = JSON.parse(e.target.result);
-                            let newEmployeeData = null;
-                            if (jsonData.employeeData && typeof jsonData.employeeData === 'object' && !Array.isArray(jsonData.employeeData)) {
-                                newEmployeeData = jsonData.employeeData;
-                            } else if (jsonData.cardDB && typeof jsonData.cardDB === 'object') {
-                                newEmployeeData = jsonData.cardDB;
-                            } else if (Array.isArray(jsonData.employeeData)) {
-                                const empObject = {};
-                                jsonData.employeeData.forEach(emp => { if(emp?.empNo) empObject[emp.empNo] = emp; });
-                                newEmployeeData = empObject;
-                            } else if (Array.isArray(jsonData)) {
-                                const empObject = {};
-                                jsonData.forEach(emp => { if(emp?.empNo) empObject[emp.empNo] = emp; });
-                                newEmployeeData = empObject;
-                            }
-                            if (newEmployeeData) {
-                                cardDB = newEmployeeData;
-                            } else {
-                                console.warn("JSONに有効な社員データ (employeeDataオブジェクトまたは配列) が見つかりません。");
-                            }
-                            if (jsonData.teamColors && typeof jsonData.teamColors === 'object') {
-                                Object.assign(teamColorDefaults, jsonData.teamColors);
-                            }
-                            if (jsonData.departmentColors && typeof jsonData.departmentColors === 'object') {
-                                Object.assign(departmentColorDefaults, jsonData.departmentColors);
-                            }
-                            populateDepartmentDropdown();
-                            populateDepartmentFilterDropdown();
-                            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
-                            showFeedbackMessage(`社員情報と配色設定をJSONから読み込みました。変更を永続化するにはサーバ保存または下書き保存を行ってください。`, false);
-                        } catch (error) {
-                            console.error("JSONファイルの読み込み/パースエラー:", error);
-                            showFeedbackMessage("JSONファイルの読み込みに失敗しました。形式を確認してください。", true);
-                        }
-                        event.target.value = '';
-                    };
-                    reader.readAsText(file);
-                }
-            });
-        }
         if (closeDeptZoneModalBtn) closeDeptZoneModalBtn.onclick = () => { if (deptZoneModal) deptZoneModal.style.display = "none"; };
         if (cancelDeptZoneSettingsBtn) cancelDeptZoneSettingsBtn.onclick = () => { if (deptZoneModal) deptZoneModal.style.display = "none"; };
         window.onclick = (event) => { if (event.target == deptZoneModal) deptZoneModal.style.display = "none"; };
@@ -1413,24 +1372,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (addOrUpdateDeptZoneBtn) addOrUpdateDeptZoneBtn.onclick = addOrUpdateDeptZoneHandler;
         if (saveDeptZoneSettingsBtn) saveDeptZoneSettingsBtn.onclick = saveDeptZoneSettingsHandler;
 
-        // refreshInitialDataBtn のイベントリスナーを追加
-        if (refreshInitialDataBtn) {
-            refreshInitialDataBtn.onclick = async () => {
-                if (currentAppMode !== 'admin') {
-                    showFeedbackMessage("閲覧モードではマスターデータを再読み込みできません。", true);
-                    return;
-                }
-                if (confirm("サーバーから最新の社員マスター情報（社員名、部署、チームカラーなど）を再読み込みします。よろしいですか？\n※現在の座席配置は維持されます。")) {
-                    try {
-                        showFeedbackMessage("社員マスター情報を再読み込み中...", false);
-                        await loadInitialServerData();
-                        showFeedbackMessage("社員マスター情報を正常に再読み込みしました。", false);
-                    } catch (error) {
-                        showFeedbackMessage("社員マスター情報の再読み込みに失敗しました。", true);
-                    }
-                }
-            };
-        }
+        // ▼▼▼ 変更箇所 ▼▼▼
+        // refreshInitialDataBtn のイベントリスナーを削除
+        // ▲▲▲ 変更箇所 ▲▲▲
 
         document.addEventListener('keydown', e => {
             if (deptZoneModal && deptZoneModal.style.display === "block") {
@@ -1462,6 +1406,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (togglePrintControlsBtn && printControlsDiv) {
             togglePrintControlsBtn.addEventListener('click', () => {
+                if (masterControlsDiv.classList.contains('active')) {
+                    masterControlsDiv.classList.remove('active');
+                }
                 printControlsDiv.classList.toggle('active');
                 updateUIBasedOnMode();
             });
@@ -1481,5 +1428,108 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         window.addEventListener('beforeprint', updatePrintHeader);
+
+        if (toggleMasterControlsBtn && masterControlsDiv) {
+            toggleMasterControlsBtn.addEventListener('click', () => {
+                if (currentAppMode !== 'admin') {
+                    showFeedbackMessage("管理者モードでのみ利用可能です。", true);
+                    return;
+                }
+                if (printControlsDiv.classList.contains('active')) {
+                    printControlsDiv.classList.remove('active');
+                }
+                masterControlsDiv.classList.toggle('active');
+                updateUIBasedOnMode();
+            });
+        }
+
+        if (masterJsonInput) {
+            masterJsonInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const jsonData = JSON.parse(e.target.result);
+                            if (typeof jsonData.employeeData !== 'object' || jsonData.employeeData === null) {
+                                throw new Error('JSONに "employeeData" が見つからないか、形式が不正です。');
+                            }
+                            loadedMasterData = jsonData;
+                            selectedFileNameSpan.textContent = file.name;
+                            showFeedbackMessage(`「${file.name}」をメモリに読み込みました。`, false);
+                            updateUIBasedOnMode();
+                        } catch (error) {
+                            console.error("マスターJSONファイルの読み込み/パースエラー:", error);
+                            showFeedbackMessage(`JSONファイルの読み込みに失敗しました: ${error.message}`, true);
+                            loadedMasterData = null;
+                            selectedFileNameSpan.textContent = "ファイルが選択されていません";
+                            updateUIBasedOnMode();
+                        }
+                    };
+                    reader.onerror = () => {
+                        showFeedbackMessage("ファイルの読み込み中にエラーが発生しました。", true);
+                        loadedMasterData = null;
+                        selectedFileNameSpan.textContent = "ファイルが選択されていません";
+                        updateUIBasedOnMode();
+                    };
+                    reader.readAsText(file);
+                }
+            });
+        }
+        
+        if (loadMasterJsonBtn) {
+            loadMasterJsonBtn.onclick = () => {
+                if (currentAppMode !== 'admin' || !loadedMasterData) return;
+                if (confirm("選択したファイルの内容で社員マスター情報を更新しますか？\n現在の座席配置は維持されます。")) {
+                    try {
+                        cardDB = loadedMasterData.employeeData || {};
+                        teamColorDefaults = loadedMasterData.teamColors || {};
+                        departmentColorDefaults = loadedMasterData.departmentColors || {};
+
+                        populateDepartmentDropdown();
+                        populateDepartmentFilterDropdown();
+                        renderList(departmentFilterSelect.value);
+                        renderFloor();
+                        showFeedbackMessage("ファイルからマスターデータを適用しました。変更を永続化するには「サーバに上書保存」を実行してください。", false);
+                    } catch(e) {
+                         showFeedbackMessage("マスターデータの適用中にエラーが発生しました。", true);
+                         console.error(e);
+                    }
+                }
+            }
+        }
+
+        if (saveMasterJsonBtn) {
+            saveMasterJsonBtn.onclick = async () => {
+                if (currentAppMode !== 'admin' || !loadedMasterData) return;
+                if (confirm("読み込んでいるファイルの内容で、サーバ上のマスターデータ(initial_data.json)を完全に上書きします。\nこの操作は元に戻せません。本当によろしいですか？")) {
+                    try {
+                        showFeedbackMessage("サーバにマスターデータを保存中...", false);
+                        const response = await fetch('/api/initial-data', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(loadedMasterData)
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({ message: 'サーバからのエラー詳細不明' }));
+                            throw new Error(`サーバ保存エラー (${response.status}): ${errorData.message || response.statusText}`);
+                        }
+                        await response.json();
+                        showFeedbackMessage("サーバのマスターデータを正常に上書き保存しました。", false);
+                    } catch (error) {
+                        console.error("マスターデータのサーバ保存に失敗しました:", error);
+                        showFeedbackMessage(`マスターデータの保存に失敗しました: ${error.message}`, true);
+                    }
+                }
+            };
+        }
+
+        if (reloadMasterDataBtn) {
+            reloadMasterDataBtn.onclick = () => {
+                if(currentAppMode !== 'admin') return;
+                loadInitialServerData(false);
+            };
+        }
     }
 });
