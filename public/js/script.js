@@ -289,7 +289,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function switchFloor(newFloorId, isInitialOrDataLoad = false) {
         if (!isInitialOrDataLoad && allFloorData[currentFloorId]) {
-            // ★★★ 修正 ★★★: データを退避する際にディープコピーを行う
             allFloorData[currentFloorId] = {
                 seatMap: JSON.parse(JSON.stringify(seatMap)),
                 mergedSeats: JSON.parse(JSON.stringify(mergedSeats)),
@@ -299,7 +298,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         currentFloorId = newFloorId;
         const targetFloorData = allFloorData[currentFloorId] || initializeNewFloorData();
-        // ★★★ 修正 ★★★: 他のフロアからデータを読み込む際もディープコピーする
         seatMap = JSON.parse(JSON.stringify(targetFloorData.seatMap || []));
         mergedSeats = JSON.parse(JSON.stringify(targetFloorData.mergedSeats || []));
         memoData = JSON.parse(JSON.stringify(targetFloorData.memoData || {}));
@@ -324,10 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const sourceData = loadedData || {};
         floorIds.forEach(id => {
             allFloorData[id] = initializeNewFloorData();
-            // ★★★ 修正 ★★★: 読み込み時もディープコピーで安全にデータを設定する
-            if (sourceData[id]) {
-                allFloorData[id] = JSON.parse(JSON.stringify(sourceData[id]));
-            }
+            if (sourceData[id]) Object.assign(allFloorData[id], JSON.parse(JSON.stringify(sourceData[id])));
         });
     }
 
@@ -361,13 +356,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
-    // ★★★ 修正 ★★★
     function saveDraftToLocal() {
-        if (currentAppMode === 'view') {
-            showFeedbackMessage("閲覧モードでは下書き保存できません。", true);
-            return;
-        }
-        // 現在編集中のフロアデータを、ディープコピーしてallFloorDataに格納する
+        if (currentAppMode === 'view') return;
         allFloorData[currentFloorId] = {
             seatMap: JSON.parse(JSON.stringify(seatMap)),
             mergedSeats: JSON.parse(JSON.stringify(mergedSeats)),
@@ -378,35 +368,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         showFeedbackMessage('下書きを保存しました。');
     }
 
-    // ★★★ 修正 ★★★
     function loadDraftFromLocal() {
-        const msg = currentAppMode === 'view'
-            ? '閲覧モードです。下書きを読み込むと現在の表示が上書きされます。よろしいですか？'
-            : '現在の全てのフロアの編集内容は破棄され、保存された下書きから全フロアのレイアウトを読み込みます。よろしいですか？';
-        if (!confirm(msg)) return;
+        if (!confirm('現在の編集内容は破棄されます。よろしいですか？')) return;
         const storedData = localStorage.getItem(LS_KEY_DRAFT_LAYOUT);
         if (storedData) {
-            try {
-                const loadedDraftData = JSON.parse(storedData);
-                initializeAllFloorData(loadedDraftData);
-                switchFloor(currentFloorId, true);
-                showFeedbackMessage('下書きを読み込みました。');
-            } catch (e) {
-                showFeedbackMessage("下書きデータの読み込みに失敗しました。データが破損している可能性があります。", true);
-                console.error("下書き読み込みエラー: ", e);
-            }
+            initializeAllFloorData(JSON.parse(storedData));
+            switchFloor(currentFloorId, true);
+            showFeedbackMessage('下書きを読み込みました。');
         } else {
             showFeedbackMessage('保存された下書きはありません。', true);
         }
     }
 
-    // ★★★ 修正 ★★★
     async function saveLayoutToServer() {
-        if (currentAppMode === 'view') {
-            showFeedbackMessage("閲覧モードではサーバに保存できません。", true);
-            return;
-        }
-        // 現在編集中のフロアデータを、ディープコピーしてallFloorDataに格納する
+        if (currentAppMode === 'view') return;
         allFloorData[currentFloorId] = {
             seatMap: JSON.parse(JSON.stringify(seatMap)),
             mergedSeats: JSON.parse(JSON.stringify(mergedSeats)),
@@ -424,16 +399,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (response.status === 409) {
                 alert("競合発生: レイアウトが他で更新されました。最新版を読み込みます。");
                 await loadLayoutFromServer(true);
-            } else {
-                throw new Error(await response.text());
-            }
+            } else throw new Error(await response.text());
         } catch (error) {
             showFeedbackMessage('サーバへの保存に失敗しました。', true);
             console.error(error);
         }
     }
 
-    // ★★★ 修正 ★★★
     async function loadLayoutFromServer(isInitialLoad = false) {
         if (!isInitialLoad && !confirm("現在の編集内容は破棄されます。よろしいですか？")) return;
         try {
@@ -441,10 +413,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!response.ok) {
                 if (response.status === 404) {
                     showFeedbackMessage("サーバにレイアウトはありません。", false);
-                    initializeAllFloorData();
-                    currentLayoutVersion = 0;
-                    // UIをリセットするためにswitchFloorを呼ぶ
-                    switchFloor(currentFloorId, true); 
+                    initializeAllFloorData(); currentLayoutVersion = 0;
+                    switchFloor(currentFloorId, true);
                     return;
                 }
                 throw new Error(`サーバエラー (${response.status})`);
@@ -452,15 +422,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const serverResponse = await response.json();
             currentLayoutVersion = serverResponse._version;
             initializeAllFloorData(serverResponse.layout);
-            // データを読み込んだ後にUIを更新するためにswitchFloorを呼ぶ
             switchFloor(currentFloorId, true);
             if (!isInitialLoad) showFeedbackMessage(`レイアウトを読込 (Ver: ${currentLayoutVersion})`);
         } catch (error) {
             showFeedbackMessage("レイアウトの読込に失敗しました。", true);
             console.error(error);
-            initializeAllFloorData();
-            currentLayoutVersion = 0;
-            // エラー時もUIをリセット
+            initializeAllFloorData(); currentLayoutVersion = 0;
             switchFloor(currentFloorId, true);
         }
     }
