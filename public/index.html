@@ -17,48 +17,61 @@
         </div>
 
         <div id="topRightControlsContainer">
-        <div id="modeSwitcher">
-        <button id="enterAdminModeBtn">
-          <i class="fa-solid fa-user-shield"></i> 管理モードへ
-        </button>
-        <button id="exitAdminModeBtn" style="display:none;">
-          <i class="fa-solid fa-eye"></i> 閲覧モードへ
-        </button>
-        <button id="togglePrintControlsBtn" title="印刷設定を開く">
-            <i class="fa-solid fa-print"></i>
-        </button>
-        </div>
+            <div id="modeSwitcher">
+                <button id="enterAdminModeBtn">
+                  <i class="fa-solid fa-user-shield"></i> 管理モードへ
+                </button>
+                <button id="exitAdminModeBtn" style="display:none;">
+                  <i class="fa-solid fa-eye"></i> 閲覧モードへ
+                </button>
+                <button id="togglePrintControlsBtn" title="印刷設定を開く">
+                    <i class="fa-solid fa-print"></i>
+                </button>
+                <button id="toggleMasterControlsBtn" title="マスターデータ管理">
+                    <i class="fas fa-database"></i>
+                </button>
+            </div>
 
-        <div id="printControls"> <p>印刷設定:</p>
-        <button id="printA4SetupBtn">A4倍率で準備</button>
-        <button id="printA3SetupBtn">A3倍率で準備</button>
-        <p class="print-info">準備後、ブラウザの印刷機能 (Ctrl+P) を使用してください。</p>
+            <div id="printControls">
+                <p>印刷設定:</p>
+                <button id="printA4SetupBtn">A4倍率で準備</button>
+                <button id="printA3SetupBtn">A3倍率で準備</button>
+                <p class="print-info">準備後、ブラウザの印刷機能 (Ctrl+P) を使用してください。</p>
+            </div>
+            <div id="masterControls" class="master-controls-panel">
+                <p>社員マスターデータ管理</p>
+                <button id="masterLoadFileBtn" class="json-io-button"><i class="fas fa-folder-open"></i> ファイルを選択</button>
+                <span id="masterSelectedFile" class="file-display">未選択</span>
+                <button id="masterSaveBtn" class="json-io-button save-button"><i class="fas fa-server"></i> サーバーへ保存</button>
+                <hr>
+                <button id="masterReloadBtn" class="json-io-button reload-button"><i class="fas fa-sync-alt"></i> サーバーから再読込</button>
+            </div>
         </div>
-        </div>
-
 
         <div class="side-panel-wrapper">
-        <div class="side-panel" id="employeeList">
-        <h2><i class="fas fa-users"></i> 未配置社員</h2>
-        <div id="employeeFilterContainer">
-        <select id="departmentFilter"></select>
-        <button id="resetFilterBtn" title="フィルター解除">🔄</button>
-        </div>
-        <input type="file" id="jsonInput" accept="application/json">
-        </div>
+            <div class="side-panel">
+                <h2><i class="fas fa-users"></i> 未配置社員</h2>
+                <div id="employeeFilterContainer">
+                    <select id="departmentFilter"></select>
+                    <button id="resetFilterBtn" title="フィルター解除">🔄</button>
+                </div>
+                <!-- ▼▼▼ 社員リスト専用のコンテナを追加 ▼▼▼ -->
+                <div id="unassigned-list-container"></div>
+                <input type="file" id="jsonInput" accept="application/json" style="display: none;">
+            </div>
         </div>
 
         <div class="grid-floor" id="floorMap">
-        <div id="topCabinet"></div>
-        <div class="side-cabinets-container" id="sideCabinetsContainer"></div>
-        <div class="department-zone-header top-zone-header" id="departmentZoneHeaderTop"></div>
-        <div class="section-islands finance-area-top" id="finance1IslandContainerTop">
-        <div class="grid-island" data-island="0"></div><div class="grid-island" data-island="1"></div><div class="grid-island" data-island="2"></div><div class="grid-island" data-island="3"></div><div class="grid-island" data-island="4"></div><div class="grid-island" data-island="5"></div><div class="grid-island" data-island="6"></div><div class="grid-island" data-island="7"></div><div class="grid-island" data-island="8"></div><div class="grid-island" data-island="9"></div><div class="grid-island" data-island="10"></div>
-        </div>
-        <div class="department-zone-header bottom-zone-header" id="departmentZoneHeaderBottom"></div>
-        <div class="section-islands finance-area-bottom" id="finance1IslandContainerBottom">
-        <div class="grid-island" data-island="11"></div><div class="grid-island" data-island="12"></div><div class="grid-island" data-island="13"></div><div class="grid-island" data-island="14"></div><div class="grid-island" data-island="15"></div><div class="grid-island" data-island="16"></div><div class="grid-island" data-island="17"></div><div class="grid-island" data-island="18"></div><div class="grid-island" data-island="19"></div><div class="grid-island" data-island="20"></div><div class="grid-island" data-island="21"></div>
-        </div>
+            <div id="topCabinet"></div>
+            <div class="side-cabinets-container" id="sideCabinetsContainer"></div>
+            <div class="department-zone-header top-zone-header" id="departmentZoneHeaderTop"></div>
+            <div class="section-islands finance-area-top" id="finance1IslandContainerTop">
+                <div class="grid-island" data-island="0"></div><div class="grid-island" data-island="1"></div><div class="grid-island" data-island="2"></div><div class="grid-island" data-island="3"></div><div class="grid-island" data-island="4"></div><div class="grid-island" data-island="5"></div><div class="grid-island" data-island="6"></div><div class="grid-island" data-island="7"></div><div class="grid-island" data-island="8"></div><div class="grid-island" data-island="9"></div><div class="grid-island" data-island="10"></div>
+            </div>
+            <div class="department-zone-header bottom-zone-header" id="departmentZoneHeaderBottom"></div>
+            <div class="section-islands finance-area-bottom" id="finance1IslandContainerBottom">
+                <div class="grid-island" data-island="11"></div><div class="grid-island" data-island="12"></div><div class="grid-island" data-island="13"></div><div class="grid-island" data-island="14"></div><div class="grid-island" data-island="15"></div><div class="grid-island" data-island="16"></div><div class="grid-island" data-island="17"></div><div class="grid-island" data-island="18"></div><div class="grid-island" data-island="19"></div><div class="grid-island" data-island="20"></div><div class="grid-island" data-island="21"></div>
+            </div>
         </div>
 
         <div class="controls-wrapper">
@@ -78,65 +91,69 @@
                     <button id="loadDraftBtn" title="下書き読込"><i class="fas fa-folder-open"></i> 下書き読込</button>
                     <button id="saveServerBtn" title="サーバー保存"><i class="fas fa-cloud-upload-alt"></i> サーバ保存</button>
                     <button id="loadServerBtn" title="サーバー読込"><i class="fas fa-cloud-download-alt"></i> サーバ読込</button>
-                    <button id="refreshInitialDataBtn" title="社員マスタ再読込"><i class="fas fa-sync-alt"></i> マスタ再読込</button>
                 </div>
             </div>
         </div>
 
-        </div>
         <div id="feedbackMessage"></div>
-
+        
         <div id="deptZoneModal" class="modal">
-        <div class="modal-content">
-        <div class="modal-header">
-        <h2>部署範囲設定 (<span id="modalCurrentFloor"></span>)</h2>
-        <span class="close-btn" id="closeDeptZoneModalBtn">&times;</span>
-        </div>
-        <div class="modal-body">
-        <div class="dept-zone-form-group row-type-selector">
-            <label>編集対象の段:</label>
-            <input type="radio" id="editTopRowRadio" name="editRowType" value="topRow" checked>
-            <label for="editTopRowRadio">上段</label>
-            <input type="radio" id="editBottomRowRadio" name="editRowType" value="bottomRow">
-            <label for="editBottomRowRadio">下段</label>
-        </div>
-        <hr>
-        <div id="currentDeptZonesContainer">
-            <h4>現在の範囲設定 (<span id="currentEditingRowDisplay">上段</span>):</h4>
-            <ul id="currentDeptZonesList"></ul>
-        </div>
-        <hr>
-        <h4>新規範囲追加 / 編集:</h4>
-        <div class="dept-zone-form-group">
-            <label for="deptZoneName">部署名:</label>
-            <select id="deptZoneName"></select>
-        </div>
-        <div class="island-range-inputs">
-            <div class="dept-zone-form-group">
-                <label for="deptZoneStart">開始席 (1～<span class="max-seat-label">22</span>):</label> <input type="number" id="deptZoneStart" min="1" value="1">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>部署範囲設定 (<span id="modalCurrentFloor"></span>)</h2>
+                    <span class="close-btn">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="dept-zone-form-group row-type-selector">
+                        <label>編集対象の段:</label>
+                        <!-- ▼▼▼ 修正箇所 ▼▼▼ -->
+                        <div class="radio-options-container">
+                            <div class="radio-option">
+                                <input type="radio" id="editTopRowRadio" name="editRowType" value="topRow" checked>
+                                <label for="editTopRowRadio">上段</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="editBottomRowRadio" name="editRowType" value="bottomRow">
+                                <label for="editBottomRowRadio">下段</label>
+                            </div>
+                        </div>
+                         <!-- ▲▲▲ 修正箇所 ▲▲▲ -->
+                    </div>
+                    <hr>
+                    <div id="currentDeptZonesContainer">
+                        <h4>現在の範囲設定 (<span id="currentEditingRowDisplay">上段</span>):</h4>
+                        <ul id="currentDeptZonesList"></ul>
+                    </div>
+                    <hr>
+                    <h4>新規範囲追加 / 編集:</h4>
+                    <div class="dept-zone-form-group">
+                        <label for="deptZoneName">部署名:</label>
+                        <select id="deptZoneName"></select>
+                    </div>
+                    <div class="island-range-inputs">
+                        <div class="dept-zone-form-group">
+                            <label for="deptZoneStart">開始席 (1～<span class="max-seat-label">22</span>):</label> 
+                            <input type="number" id="deptZoneStart" min="1" value="1">
+                        </div>
+                        <div class="dept-zone-form-group">
+                            <label for="deptZoneEnd">終了席 (1～<span class="max-seat-label">22</span>):</label> 
+                            <input type="number" id="deptZoneEnd" min="1" value="1">
+                        </div>
+                    </div>
+                    <div class="dept-zone-form-group">
+                        <label for="deptZoneColor">表示色:</label>
+                        <input type="color" id="deptZoneColor" value="#FFDDC1">
+                    </div>
+                    <button id="addOrUpdateDeptZoneBtn">範囲を追加</button>
+                    <input type="hidden" id="editingZoneIndex" value="-1">
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelDeptZoneSettingsBtn" class="cancel-settings-btn">キャンセル</button>
+                    <button id="saveDeptZoneSettingsBtn" class="save-settings-btn">このフロアの設定を保存</button>
+                </div>
             </div>
-            <div class="dept-zone-form-group">
-                <label for="deptZoneEnd">終了席 (1～<span class="max-seat-label">22</span>):</label> <input type="number" id="deptZoneEnd" min="1" value="1">
-            </div>
-        </div>
-        <div class="dept-zone-form-group">
-            <label for="deptZoneColor">表示色:</label>
-            <input type="color" id="deptZoneColor" value="#FFDDC1">
-        </div>
-        <button id="addOrUpdateDeptZoneBtn">範囲を追加</button>
-        <input type="hidden" id="editingZoneIndex" value="-1">
-        </div>
-        <div class="modal-footer">
-        <button id="cancelDeptZoneSettingsBtn" class="cancel-settings-btn">キャンセル</button>
-        <button id="saveDeptZoneSettingsBtn" class="save-settings-btn">このフロアの設定を保存</button>
-        </div>
-        </div>
         </div>
 
-        <!-- JSON Patch ライブラリ -->
-        <script src="https://cdn.jsdelivr.net/npm/fast-json-patch@3.1.1/dist/fast-json-patch.min.js"></script>
-        <!-- スクリプトファイル -->
         <script src="js/script.js"></script>
     </body>
     </html>
-    
