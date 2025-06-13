@@ -528,7 +528,7 @@
       border-radius: 5px;
       cursor: pointer;
       display: none;
-      transition: background-color: 0.3s ease;
+      transition: background-color 0.3s ease;
     }
     .admin-mode .seat-cell.selected:has(.seat-card) .return-btn {
         display: block;
