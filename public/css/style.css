@@ -764,6 +764,14 @@
         opacity: 0.6;
         cursor: not-allowed !important;
     }
+
+    /* --- 修正箇所 --- */
+    /* 閲覧モードの時に、右下の設定ボタン（歯車アイコン）のラッパーごと非表示にする */
+    .view-mode .controls-wrapper {
+        display: none;
+    }
+    /* --- 修正ここまで --- */
+
     .view-mode .employee-item { cursor: default !important; }
     .view-mode .memo-display { cursor: default !important; }
     .view-mode .seat-cell:not(.merged-seat) { cursor: default !important; }
