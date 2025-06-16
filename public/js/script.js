@@ -48,6 +48,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const jsonInput = document.getElementById('jsonInput'); // 社員情報JSONアップロード用
     const topCabinetDiv = document.getElementById('topCabinet');
     const sideCabinetsContainer = document.getElementById('sideCabinetsContainer');
+    const toggleHelpBtn = document.getElementById('toggleHelpBtn');
+    const downloadMasterDataBtn = document.getElementById('downloadMasterDataBtn');
 
     // コントロールパネル関連
     const controlsToggleBtn = document.getElementById('controlsToggleBtn');
@@ -1288,6 +1290,88 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    async function downloadMasterData() {
+    // currentAppMode の参照方法を修正
+    const body = document.body;
+    const isAdminMode = body.classList.contains('admin-mode');
+    
+    if (!isAdminMode) {
+        // showFeedbackMessage が使えない場合はalertで代替
+        alert("管理者モードでのみ利用可能です。");
+        return;
+    }
+    
+    try {
+        console.log("マスタデータダウンロード開始");
+        
+        // 既存のAPIエンドポイントを使用
+        const response = await fetch('/api/initial-data');
+        
+        if (!response.ok) {
+            throw new Error(`サーバエラー (${response.status}): マスタデータを取得できませんでした。`);
+        }
+        
+        const data = await response.json();
+        
+        // タイムスタンプ付きファイル名を生成
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `initial_data_${timestamp}.json`;
+        
+        // ファイルダウンロード
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log("マスタデータダウンロード完了:", filename);
+        
+        // フィードバックメッセージを表示（showFeedbackMessage が利用可能な場合のみ）
+        if (typeof showFeedbackMessage === 'function') {
+            showFeedbackMessage("マスタデータのダウンロードが完了しました。", false);
+        } else {
+            // フォールバック: 画面上部に一時的なメッセージを表示
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 5px;
+                z-index: 1000;
+                font-size: 14px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            `;
+            messageDiv.textContent = `マスタデータのダウンロードが完了しました (${filename})`;
+            document.body.appendChild(messageDiv);
+            
+            // 3秒後に自動削除
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    document.body.removeChild(messageDiv);
+                }
+            }, 3000);
+        }
+        
+    } catch (error) {
+        console.error("マスタデータのダウンロードに失敗しました:", error);
+        
+        // エラーメッセージも同様にフォールバック
+        if (typeof showFeedbackMessage === 'function') {
+            showFeedbackMessage(`マスタデータのダウンロードに失敗しました: ${error.message}`, true);
+        } else {
+            alert(`マスタデータのダウンロードに失敗しました: ${error.message}`);
+        }
+    }
+    }
 
     function setupEventListeners() {
         document.addEventListener('mouseup', () => {
@@ -1441,6 +1525,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 masterControlsDiv.classList.toggle('active');
                 updateUIBasedOnMode();
             });
+        }
+
+        // ヘルプボタンのイベントリスナー
+        if (toggleHelpBtn) {
+            toggleHelpBtn.addEventListener('click', () => {
+                window.open('manual.html', '_blank');
+            });
+            console.log("ヘルプボタンのイベントリスナーを設定しました");
+        } else {
+            console.warn("toggleHelpBtn が見つかりません");
+        }
+
+        // マスタダウンロードボタンのイベントリスナー
+        if (downloadMasterDataBtn) {
+            downloadMasterDataBtn.addEventListener('click', downloadMasterData);
+            console.log("マスタダウンロードボタンのイベントリスナーを設定しました");
+        } else {
+            console.warn("downloadMasterDataBtn が見つかりません");
         }
 
         if (masterJsonInput) {

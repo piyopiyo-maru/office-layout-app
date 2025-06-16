@@ -5,7 +5,7 @@ const path = require('path');
 const { compare, applyPatch } = require('fast-json-patch');
 
 const app = express();
-const PORT = 3000;
+const PORT = 9000;
 
 const DATA_DIR = path.join(__dirname, 'data');
 const BACKUP_DIR = path.join(DATA_DIR, 'backup');
@@ -232,4 +232,23 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
+});
+
+// マスタデータダウンロード用エンドポイント
+app.get('/api/download-initial-data', async (req, res) => {
+    console.log('GET /api/download-initial-data hit');
+    try {
+        const initialData = await getInitialData();
+        
+        // ファイル名にタイムスタンプを追加
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `initial_data_${timestamp}.json`;
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.json(initialData);
+    } catch (error) {
+        console.error('Server error in /api/download-initial-data:', error);
+        res.status(500).json({ message: "Server error: Could not download initial data.", error: error.message });
+    }
 });

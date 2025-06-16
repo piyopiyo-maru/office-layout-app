@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
     <html lang="ja">
     <head>
         <meta charset="UTF-8">
@@ -27,8 +27,11 @@
             <button id="togglePrintControlsBtn" title="印刷設定を開く">
                 <i class="fa-solid fa-print"></i>
             </button>
-            <button id="toggleMasterControlsBtn" title="マスターデータ管理">
+            <button id="toggleMasterControlsBtn" title="マスタデータ管理">
                 <i class="fa-solid fa-database"></i>
+            </button>
+            <button id="toggleHelpBtn" title="操作マニュアル">
+                <i class="fa-solid fa-question"></i>
             </button>
         </div>
 
@@ -39,7 +42,8 @@
             <p class="print-info">準備後、ブラウザの印刷機能 (Ctrl+P) を使用してください。</p>
         </div>
         <div id="masterControls">
-            <p>マスターデータ管理:</p>
+            <p>マスタデータ管理:</p>
+            <button id="downloadMasterDataBtn"><i class="fa-solid fa-download"></i> マスタダウンロード</button>
             <input type="file" id="masterJsonInput" accept="application/json" style="display: none;">
             <label for="masterJsonInput" class="btn-like-label"><i class="fa-solid fa-file-arrow-up"></i> ファイルを選択</label>
             <span id="selectedFileName">ファイルが選択されていません</span>
