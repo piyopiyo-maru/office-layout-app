@@ -105,12 +105,120 @@ async function saveLayoutData(data) {
 // ▲▲▲ 変更箇所 ▲▲▲
 
 // ▼▼▼ 変更箇所 ▼▼▼
+function validateEmployeeData(data) {
+    const allowedFields = ['empNo', 'name', 'title', 'dept', 'team', 'ext', 'ctstage'];
+    const maxLength = {
+        empNo: 20,
+        name: 50,
+        title: 30,
+        dept: 50,
+        team: 50,
+        ext: 20,
+        ctstage: 30
+    };
+    
+    // HTMLタグ検出パターン
+    const htmlPattern = /<[^>]*>/g;
+    const scriptPattern = /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi;
+    
+    for (const empNo in data.employeeData) {
+        const employee = data.employeeData[empNo];
+        
+        // 社員番号の検証
+        if (typeof empNo !== 'string' || empNo.length === 0 || empNo.length > 20) {
+            throw new Error(`Invalid employee number: ${empNo}`);
+        }
+        
+        // HTMLタグやスクリプトの検出
+        if (htmlPattern.test(empNo) || scriptPattern.test(empNo)) {
+            throw new Error(`HTML/Script tags not allowed in employee number: ${empNo}`);
+        }
+        
+        // 各フィールドの検証
+        for (const key in employee) {
+            if (!allowedFields.includes(key)) {
+                throw new Error(`Invalid field: ${key} for employee ${empNo}`);
+            }
+            
+            const value = employee[key];
+            if (value !== null && value !== undefined) {
+                // 文字列型チェック
+                if (typeof value !== 'string') {
+                    throw new Error(`Field ${key} must be string for employee ${empNo}`);
+                }
+                
+                // 長さ制限
+                if (value.length > maxLength[key]) {
+                    throw new Error(`Field ${key} too long for employee ${empNo} (max: ${maxLength[key]})`);
+                }
+                
+                // HTMLタグ検出
+                if (htmlPattern.test(value)) {
+                    throw new Error(`HTML tags not allowed in field ${key} for employee ${empNo}`);
+                }
+                
+                // スクリプトタグの検出
+                if (scriptPattern.test(value)) {
+                    throw new Error(`Script tags not allowed in field ${key} for employee ${empNo}`);
+                }
+                
+                // 危険な文字列パターンの検出
+                const dangerousPatterns = [
+                    /javascript:/i,
+                    /vbscript:/i,
+                    /on\w+\s*=/i,
+                    /data:text\/html/i
+                ];
+                
+                for (const pattern of dangerousPatterns) {
+                    if (pattern.test(value)) {
+                        throw new Error(`Dangerous pattern detected in field ${key} for employee ${empNo}`);
+                    }
+                }
+            }
+        }
+    }
+    
+    // 部署カラーとチームカラーの検証
+    if (data.departmentColors) {
+        for (const [dept, color] of Object.entries(data.departmentColors)) {
+            if (typeof dept !== 'string' || dept.length > 50) {
+                throw new Error(`Invalid department name: ${dept}`);
+            }
+            if (htmlPattern.test(dept)) {
+                throw new Error(`HTML tags not allowed in department name: ${dept}`);
+            }
+            if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+                throw new Error(`Invalid color format for department ${dept}: ${color}`);
+            }
+        }
+    }
+    
+    if (data.teamColors) {
+        for (const [team, color] of Object.entries(data.teamColors)) {
+            if (typeof team !== 'string' || team.length > 50) {
+                throw new Error(`Invalid team name: ${team}`);
+            }
+            if (htmlPattern.test(team)) {
+                throw new Error(`HTML tags not allowed in team name: ${team}`);
+            }
+            if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+                throw new Error(`Invalid color format for team ${team}: ${color}`);
+            }
+        }
+    }
+}
+
 async function saveInitialData(data) {
     try {
-        // 簡単なバリデーション
+        // 基本構造のバリデーション
         if (!data || typeof data.employeeData !== 'object' || data.employeeData === null) {
             throw new Error("Invalid data structure: employeeData is missing or not an object.");
         }
+        
+        // 詳細なバリデーション
+        validateEmployeeData(data);
+        
         await createBackup(INITIAL_DATA_PATH); // バックアップを作成
         await fs.writeJson(INITIAL_DATA_PATH, data, { spaces: 2 });
         console.log("Initial data saved successfully.");
@@ -123,7 +231,6 @@ async function saveInitialData(data) {
 
 // API Endpoints
 app.get('/api/initial-data', async (req, res) => {
-    console.log('GET /api/initial-data hit');
     try {
         const initialData = await getInitialData();
         res.json(initialData);
@@ -134,7 +241,6 @@ app.get('/api/initial-data', async (req, res) => {
 });
 
 app.post('/api/initial-data', async (req, res) => {
-    console.log('POST /api/initial-data hit');
     const newData = req.body;
     try {
         await saveInitialData(newData);
@@ -146,7 +252,6 @@ app.post('/api/initial-data', async (req, res) => {
 });
 
 app.get('/api/layouts/default', async (req, res) => {
-    console.log('GET /api/layouts/default hit');
     try {
         const layoutData = await getLayoutData();
         res.json(layoutData);
@@ -156,7 +261,6 @@ app.get('/api/layouts/default', async (req, res) => {
 });
 
 app.post('/api/layouts/default', async (req, res) => {
-    console.log('POST /api/layouts/default hit with version:', req.body._version);
     const clientData = req.body;
     const clientVersion = clientData._version;
     const clientLayout = clientData.layout;
@@ -170,7 +274,6 @@ app.post('/api/layouts/default', async (req, res) => {
         const serverVersion = currentServerData._version;
 
         if (clientVersion !== serverVersion) {
-            console.warn(`Conflict detected: Client version ${clientVersion}, Server version ${serverVersion}`);
             return res.status(409).json({
                 message: 'Conflict: Layout updated by another user.',
                 serverVersion: serverVersion,
@@ -184,7 +287,6 @@ app.post('/api/layouts/default', async (req, res) => {
         };
 
         await saveLayoutData(newDataToSave);
-        console.log(`Layout saved successfully: Version ${serverVersion} -> ${newVersion}`);
         res.json({
             message: 'Layout saved successfully.',
             _newVersion: newVersion,
@@ -197,13 +299,13 @@ app.post('/api/layouts/default', async (req, res) => {
     }
 });
 
-// Wildcard route for SPA - MUST BE LAST
-app.get(/.*/, (req, res) => {
+// Serve index.html for root route
+app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, async () => {
-    console.log(`Server listening on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', async () => {
+    console.log(`Server listening on http://0.0.0.0:${PORT}`);
     try {
         // Ensure data directory exists
         await fs.ensureDir(path.join(__dirname, 'data'));
@@ -236,7 +338,6 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // マスタデータダウンロード用エンドポイント
 app.get('/api/download-initial-data', async (req, res) => {
-    console.log('GET /api/download-initial-data hit');
     try {
         const initialData = await getInitialData();
         

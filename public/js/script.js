@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    // --- 定数定義 ---
+    try {
+        console.log('=== Starting script execution ===');
+        // --- 定数定義 ---
     const rows = 4, cols = 2;
     const totalIslands = 22;
     const islandsPerRow = 11;
@@ -37,7 +39,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isDragging = false; // ドラッグ操作中かどうかのフラグ
     let mousedownOnDraggable = null; // mousedownされたドラッグ可能要素を一時保持
 
+    // --- セキュリティ関数 ---
+    function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') {
+            return String(unsafe || '');
+        }
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function createSafeTextElement(tagName, text, className = null) {
+        const element = document.createElement(tagName);
+        element.textContent = text || '';
+        if (className) {
+            element.className = className;
+        }
+        return element;
+    }
+
     // --- DOM要素取得 ---
+    console.log('=== Starting DOM element retrieval ===');
     const feedbackMessageDiv = document.getElementById('feedbackMessage');
     const currentFloorNameDisplay = document.getElementById('currentFloorName');
     const switchFloorButton = document.getElementById('switchFloorButton');
@@ -56,6 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const controlsPanel = document.getElementById('controlsPanel');
     const toggleListBtn = document.getElementById('toggleListBtn');
     const deptZoneSettingsBtn = document.getElementById('deptZoneSettingsBtn');
+    console.log('deptZoneSettingsBtn element:', deptZoneSettingsBtn);
     const mergeBtn = document.getElementById('mergeBtn');
     const upBtn = document.getElementById('upBtn');
     const leftBtn = document.getElementById('leftBtn');
@@ -72,7 +98,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // モード切替ボタン
     const enterAdminModeBtn = document.getElementById('enterAdminModeBtn');
+    console.log('enterAdminModeBtn element:', enterAdminModeBtn);
     const exitAdminModeBtn = document.getElementById('exitAdminModeBtn');
+    console.log('exitAdminModeBtn element:', exitAdminModeBtn);
+    console.log('=== DOM element retrieval completed ===');
 
     // 印刷設定関連
     const htmlElement = document.documentElement;
@@ -111,8 +140,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- 初期化処理の順序 ---
+    console.log('=== About to load initial server data ===');
     try {
         await loadInitialServerData(true); // isInitialLoad を true に
+        console.log('=== Initial server data loaded successfully ===');
     } catch (error) {
         console.error("致命的エラー: 初期データのロードに失敗しました。", error);
         showFeedbackMessage("アプリケーションの起動に必要な基本データを読み込めませんでした。管理者に連絡してください。", true);
@@ -129,8 +160,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         switchFloor(currentFloorId, true);
     }
 
+    console.log('=== About to setup event listeners ===');
     setupEventListeners();
+    console.log('=== Event listeners setup completed ===');
     setAppMode('view'); // ★★★ 初期ロード完了後、確実に閲覧モードのUI状態にする ★★★
+    
+    // 初期状態でbodyクラスが正しく設定されているか確認
+    console.log('Initial body class:', document.body.className);
+    console.log('Initial app mode:', currentAppMode);
 
 
     // --- 関数定義 ---
@@ -472,9 +509,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     function populateDepartmentFilterDropdown() {
         if (!departmentFilterSelect) return;
         const existingValue = departmentFilterSelect.value;
-        departmentFilterSelect.innerHTML = '<option value="">すべての部署</option>';
+        
+        // 安全な方法でオプションをクリア
+        departmentFilterSelect.innerHTML = '';
+        
+        // デフォルトオプションを安全に追加
+        const defaultOption = new Option('すべての部署', '');
+        departmentFilterSelect.add(defaultOption);
+        
         const depts = new Set(Object.values(cardDB).map(emp => emp?.dept).filter(Boolean));
         Array.from(depts).sort().forEach(dept => {
+            // new Option()を使用することで自動的にエスケープされる
             departmentFilterSelect.add(new Option(dept, dept));
         });
         departmentFilterSelect.value = existingValue;
@@ -517,24 +562,49 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!info) {
             card.style.backgroundColor = teamColorDefaults['unknown_team'] || '#eeeeee';
-            card.innerHTML = `<div><strong>${empNo}</strong></div><div>(社員情報なし)</div>`;
+            
+            // 安全な方法で要素を作成
+            const empDiv = document.createElement('div');
+            const strongEmp = document.createElement('strong');
+            strongEmp.textContent = empNo; // XSS対策: textContentを使用
+            empDiv.appendChild(strongEmp);
+            card.appendChild(empDiv);
+            
+            const infoDiv = document.createElement('div');
+            infoDiv.textContent = '(社員情報なし)';
+            card.appendChild(infoDiv);
+            
             return card;
         }
 
         card.dataset.empNo = empNo;
         const teamColor = teamColorDefaults[info.team] || teamColorDefaults['unknown_team'] || '#eeeeee';
         card.style.backgroundColor = teamColor;
-        let cardHTML = '';
+
+        // 安全な方法で各要素を作成
         if (info.title && info.title !== "0" && info.title !== "一般") {
-            cardHTML += `<div>${info.title}</div>`;
+            const titleDiv = createSafeTextElement('div', info.title);
+            card.appendChild(titleDiv);
         } else if (info.title === "0" || info.title === "一般") {
-            cardHTML += `<div>&nbsp;</div>`;
+            const emptyDiv = document.createElement('div');
+            emptyDiv.innerHTML = '&nbsp;'; // これは安全
+            card.appendChild(emptyDiv);
         }
-        cardHTML += `<div><strong>${info.empNo}</strong></div>`;
-        cardHTML += `<div class="employee-name">${info.name}</div>`;
-        cardHTML += `<div>内線: ${info.ext || '-'}</div>`;
-        cardHTML += `<div>Tel.: ${info.ctstage || '-'}</div>`;
-        card.innerHTML = cardHTML;
+
+        const empNoDiv = document.createElement('div');
+        const strongElement = document.createElement('strong');
+        strongElement.textContent = info.empNo; // XSS対策: textContentを使用
+        empNoDiv.appendChild(strongElement);
+        card.appendChild(empNoDiv);
+
+        const nameDiv = createSafeTextElement('div', info.name, 'employee-name');
+        card.appendChild(nameDiv);
+
+        const extDiv = createSafeTextElement('div', `内線: ${info.ext || '-'}`);
+        card.appendChild(extDiv);
+
+        const telDiv = createSafeTextElement('div', `Tel.: ${info.ctstage || '-'}`);
+        card.appendChild(telDiv);
 
         if (currentAppMode === 'admin') {
             card.draggable = true;
@@ -719,7 +789,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (isMerged) {
                         cell.classList.add('merged-seat');
                         if (mergeMode && currentAppMode === 'admin') {
-                            cell.innerHTML = '<span class="merged-mark">合体席</span>';
+                            // 安全な方法でマークを追加
+                            const mergedSpan = document.createElement('span');
+                            mergedSpan.className = 'merged-mark';
+                            mergedSpan.textContent = '合体席';
+                            cell.appendChild(mergedSpan);
                         }
                     }
                     const empNo = seatMap?.[isl]?.[r]?.[c];
@@ -727,7 +801,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const cardElement = createCard(empNo);
                         if (cardElement) cell.appendChild(cardElement);
                     } else if (empNo && !cardDB[empNo]) {
-                        cell.innerHTML = `<div class="seat-card" style="background-color: ${teamColorDefaults['unknown_team'] || '#eeeeee'};"><div><strong>${empNo}</strong></div><div>(情報読込中...)</div></div>`;
+                        // 安全な方法で不明社員情報カードを作成
+                        const unknownCard = document.createElement('div');
+                        unknownCard.className = 'seat-card';
+                        unknownCard.style.backgroundColor = teamColorDefaults['unknown_team'] || '#eeeeee';
+                        
+                        const empDiv = document.createElement('div');
+                        const strongEmp = document.createElement('strong');
+                        strongEmp.textContent = empNo; // XSS対策: textContentを使用
+                        empDiv.appendChild(strongEmp);
+                        unknownCard.appendChild(empDiv);
+                        
+                        const statusDiv = document.createElement('div');
+                        statusDiv.textContent = '(情報読込中...)';
+                        unknownCard.appendChild(statusDiv);
+                        
+                        cell.appendChild(unknownCard);
                     } else if (!isMerged && !empNo) {
                         cell.textContent = '空席';
                     } else if (isMerged && !empNo && !(mergeMode && currentAppMode === 'admin')) {
@@ -833,9 +922,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function setAppMode(newMode) {
+        console.log('=== setAppMode called with:', newMode);
         if (newMode !== 'view' && newMode !== 'admin') return;
         currentAppMode = newMode;
         document.body.className = currentAppMode + '-mode';
+        console.log('Body class set to:', document.body.className);
+        console.log('currentAppMode is now:', currentAppMode);
         updateUIBasedOnMode(); // モード変更時にUI要素の状態を更新
 
         if (newMode === 'view') {
@@ -866,6 +958,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function updateUIBasedOnMode() {
         const isAdminMode = currentAppMode === 'admin';
+        
+        // bodyクラスを更新してCSSでのスタイル制御を有効にする
+        document.body.className = isAdminMode ? 'admin-mode' : 'view-mode';
+        
         if (enterAdminModeBtn) enterAdminModeBtn.style.display = isAdminMode ? 'none' : 'flex';
         if (exitAdminModeBtn) exitAdminModeBtn.style.display = isAdminMode ? 'flex' : 'none';
 
@@ -934,9 +1030,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (departmentFilterSelect) departmentFilterSelect.disabled = !isAdminMode;
         if (resetFilterBtn) resetFilterBtn.disabled = !isAdminMode;
+        
+        // モード変更時に部署範囲を再レンダリング（リサイズハンドルの表示切り替えのため）
+        renderDepartmentZoneHeaders();
     }
 
     function renderDepartmentZoneHeaders() {
+        console.log('renderDepartmentZoneHeaders called, currentAppMode:', currentAppMode);
         const topHeader = document.getElementById('departmentZoneHeaderTop');
         const bottomHeader = document.getElementById('departmentZoneHeaderBottom');
         if (!topHeader || !bottomHeader) return;
@@ -946,24 +1046,114 @@ document.addEventListener('DOMContentLoaded', async () => {
         bottomHeader.style.gridTemplateColumns = `repeat(${seatsPerRow}, 1fr)`;
         const currentZones = departmentZoneSettings;
         if (currentZones?.topRow?.length) {
-            currentZones.topRow.forEach(zone => {
+            currentZones.topRow.forEach((zone, index) => {
                 if (typeof zone.startSeatIndex !== 'number' || typeof zone.endSeatIndex !== 'number') return;
                 const block = document.createElement('div');
                 block.className = 'dept-zone-block';
                 block.textContent = zone.deptName;
                 block.style.gridColumn = `${zone.startSeatIndex + 1} / span ${Math.max(1, zone.endSeatIndex - zone.startSeatIndex + 1)}`;
                 block.style.backgroundColor = zone.color || '#f0f0f0';
+                block.dataset.zoneIndex = index;
+                block.dataset.rowType = 'topRow';
+                
+                // リサイズハンドルを追加（管理モード時のみ）
+                if (currentAppMode === 'admin') {
+                    console.log('Adding resize handles for topRow zone:', index, zone.deptName);
+                    console.log('Block element:', block);
+                    console.log('Body class:', document.body.className);
+                    
+                    const leftHandle = document.createElement('div');
+                    leftHandle.className = 'dept-zone-resize-handle left';
+                    leftHandle.dataset.side = 'left';
+                    leftHandle.dataset.zoneIndex = index;
+                    leftHandle.dataset.rowType = 'topRow';
+                    leftHandle.style.backgroundColor = 'red'; // 強制的に赤色
+                    leftHandle.style.width = '10px'; // 強制的に幅を設定
+                    leftHandle.style.display = 'block'; // 強制的に表示
+                    leftHandle.title = 'Left resize handle'; // ツールチップ追加
+                    block.appendChild(leftHandle);
+
+                    const rightHandle = document.createElement('div');
+                    rightHandle.className = 'dept-zone-resize-handle right';
+                    rightHandle.dataset.side = 'right';
+                    rightHandle.dataset.zoneIndex = index;
+                    rightHandle.dataset.rowType = 'topRow';
+                    rightHandle.style.backgroundColor = 'red'; // 強制的に赤色
+                    rightHandle.style.width = '10px'; // 強制的に幅を設定
+                    rightHandle.style.display = 'block'; // 強制的に表示
+                    rightHandle.title = 'Right resize handle'; // ツールチップ追加
+                    block.appendChild(rightHandle);
+                    
+                    console.log('Left handle added:', leftHandle);
+                    console.log('Right handle added:', rightHandle);
+                    console.log('Block children count:', block.children.length);
+                }
+                
+                // 部署ゾーンクリックイベントリスナーを追加（管理モード時のみ）
+                if (currentAppMode === 'admin') {
+                    block.addEventListener('click', (e) => {
+                        // リサイズハンドルのクリックを除外
+                        if (e.target.classList.contains('dept-zone-resize-handle')) {
+                            return;
+                        }
+                        showDeptZoneClickDropdown(e, 'topRow', index);
+                    });
+                }
+                
                 topHeader.appendChild(block);
             });
         }
         if (currentZones?.bottomRow?.length) {
-            currentZones.bottomRow.forEach(zone => {
+            currentZones.bottomRow.forEach((zone, index) => {
                 if (typeof zone.startSeatIndex !== 'number' || typeof zone.endSeatIndex !== 'number') return;
                 const block = document.createElement('div');
                 block.className = 'dept-zone-block';
                 block.textContent = zone.deptName;
                 block.style.gridColumn = `${zone.startSeatIndex + 1} / span ${Math.max(1, zone.endSeatIndex - zone.startSeatIndex + 1)}`;
                 block.style.backgroundColor = zone.color || '#f0f0f0';
+                block.dataset.zoneIndex = index;
+                block.dataset.rowType = 'bottomRow';
+                
+                // リサイズハンドルを追加（管理モード時のみ）
+                if (currentAppMode === 'admin') {
+                    console.log('Adding resize handles for bottomRow zone:', index, zone.deptName);
+                    
+                    const leftHandle = document.createElement('div');
+                    leftHandle.className = 'dept-zone-resize-handle left';
+                    leftHandle.dataset.side = 'left';
+                    leftHandle.dataset.zoneIndex = index;
+                    leftHandle.dataset.rowType = 'bottomRow';
+                    leftHandle.style.backgroundColor = 'red'; // 強制的に赤色
+                    leftHandle.style.width = '10px'; // 強制的に幅を設定
+                    leftHandle.style.display = 'block'; // 強制的に表示
+                    leftHandle.title = 'Left resize handle'; // ツールチップ追加
+                    block.appendChild(leftHandle);
+
+                    const rightHandle = document.createElement('div');
+                    rightHandle.className = 'dept-zone-resize-handle right';
+                    rightHandle.dataset.side = 'right';
+                    rightHandle.dataset.zoneIndex = index;
+                    rightHandle.dataset.rowType = 'bottomRow';
+                    rightHandle.style.backgroundColor = 'red'; // 強制的に赤色
+                    rightHandle.style.width = '10px'; // 強制的に幅を設定
+                    rightHandle.style.display = 'block'; // 強制的に表示
+                    rightHandle.title = 'Right resize handle'; // ツールチップ追加
+                    block.appendChild(rightHandle);
+                    
+                    console.log('Bottom row handles added for zone:', zone.deptName);
+                }
+                
+                // 部署ゾーンクリックイベントリスナーを追加（管理モード時のみ）
+                if (currentAppMode === 'admin') {
+                    block.addEventListener('click', (e) => {
+                        // リサイズハンドルのクリックを除外
+                        if (e.target.classList.contains('dept-zone-resize-handle')) {
+                            return;
+                        }
+                        showDeptZoneClickDropdown(e, 'bottomRow', index);
+                    });
+                }
+                
                 bottomHeader.appendChild(block);
             });
         }
@@ -976,6 +1166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function openDeptZoneModal() {
+        console.log('=== openDeptZoneModal called, currentAppMode:', currentAppMode);
         if (currentAppMode === 'view') return;
         if (deptZoneModal && modalCurrentFloorSpan && currentEditingRowDisplay) {
             modalCurrentFloorSpan.textContent = currentFloorId;
@@ -1025,14 +1216,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function displayCurrentDeptZones() {
         if (!currentDeptZonesList || !tempDepartmentZones || !tempDepartmentZones[currentEditingRowType]) {
-            if (currentDeptZonesList) currentDeptZonesList.innerHTML = '<li>範囲設定はありません。</li>';
+            if (currentDeptZonesList) {
+                currentDeptZonesList.innerHTML = '';
+                const noDataLi = document.createElement('li');
+                noDataLi.textContent = '範囲設定はありません。';
+                currentDeptZonesList.appendChild(noDataLi);
+            }
             return;
         }
         currentDeptZonesList.innerHTML = '';
         const zonesToShow = tempDepartmentZones[currentEditingRowType];
         const isAdminModeActive = currentAppMode === 'admin';
         if (zonesToShow.length === 0) {
-            currentDeptZonesList.innerHTML = '<li>範囲設定はありません。</li>';
+            const noDataLi = document.createElement('li');
+            noDataLi.textContent = '範囲設定はありません。';
+            currentDeptZonesList.appendChild(noDataLi);
             return;
         }
         zonesToShow.forEach((zone, index) => {
@@ -1126,10 +1324,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function saveDeptZoneSettingsHandler() {
+        console.log('=== saveDeptZoneSettingsHandler called');
+        console.log('currentAppMode:', currentAppMode);
+        console.log('tempDepartmentZones:', tempDepartmentZones);
         if (currentAppMode === 'view') return;
         if (!allFloorData[currentFloorId]) allFloorData[currentFloorId] = initializeNewFloorData();
         allFloorData[currentFloorId].departmentZones = JSON.parse(JSON.stringify(tempDepartmentZones));
         departmentZoneSettings = JSON.parse(JSON.stringify(tempDepartmentZones));
+        console.log('departmentZoneSettings updated to:', departmentZoneSettings);
         renderDepartmentZoneHeaders();
         if (deptZoneModal) deptZoneModal.style.display = "none";
         showFeedbackMessage("部署範囲設定を現在の編集セッションに適用しました。サーバ保存または下書き保存を行ってください。", false);
@@ -1374,6 +1576,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function setupEventListeners() {
+        console.log('=== Inside setupEventListeners function ===');
         document.addEventListener('mouseup', () => {
             mousedownOnDraggable = null;
         });
@@ -1404,7 +1607,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 toggleListBtn.classList.toggle('active', isHidden);
             };
         }
-        if (deptZoneSettingsBtn) deptZoneSettingsBtn.onclick = openDeptZoneModal;
+        if (deptZoneSettingsBtn) {
+            console.log('Setting up deptZoneSettingsBtn click handler');
+            deptZoneSettingsBtn.onclick = () => {
+                console.log('=== Department zone settings button clicked');
+                openDeptZoneModal();
+            };
+        } else {
+            console.log('WARNING: deptZoneSettingsBtn not found!');
+        }
         if (mergeBtn) {
             mergeBtn.onclick = () => {
                 if (currentAppMode === 'view') return;
@@ -1429,10 +1640,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (saveServerBtn) saveServerBtn.onclick = saveLayoutToServer;
         if (loadServerBtn) loadServerBtn.onclick = () => loadLayoutFromServer(false);
         if (enterAdminModeBtn) {
+            console.log('Setting up enterAdminModeBtn click handler');
             enterAdminModeBtn.onclick = () => {
+                console.log('=== Admin mode button clicked');
                 setAppMode('admin');
                 showFeedbackMessage("管理モードに移行しました。", false);
             };
+        } else {
+            console.log('WARNING: enterAdminModeBtn not found!');
         }
         if (exitAdminModeBtn) {
             exitAdminModeBtn.onclick = () => {
@@ -1633,5 +1848,297 @@ document.addEventListener('DOMContentLoaded', async () => {
                 loadInitialServerData(false);
             };
         }
+    }
+
+    // 部署範囲リサイズ機能
+    let isResizingZone = false;
+    let resizingZoneData = null;
+
+    function initializeDeptZoneResize() {
+        document.addEventListener('mousedown', handleResizeStart);
+        document.addEventListener('mousemove', handleResizeMove);
+        document.addEventListener('mouseup', handleResizeEnd);
+    }
+
+    function handleResizeStart(e) {
+        if (currentAppMode !== 'admin') return;
+        
+        const handle = e.target.closest('.dept-zone-resize-handle');
+        if (!handle) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        isResizingZone = true;
+        handle.classList.add('active');
+        
+        const zoneIndex = parseInt(handle.dataset.zoneIndex);
+        const rowType = handle.dataset.rowType;
+        const side = handle.dataset.side;
+        
+        resizingZoneData = {
+            zoneIndex,
+            rowType,
+            side,
+            handle,
+            startX: e.clientX,
+            originalZone: JSON.parse(JSON.stringify(departmentZoneSettings[rowType][zoneIndex]))
+        };
+        
+        document.body.style.cursor = 'ew-resize';
+    }
+
+    function handleResizeMove(e) {
+        if (!isResizingZone || !resizingZoneData) return;
+        
+        e.preventDefault();
+        
+        const deltaX = e.clientX - resizingZoneData.startX;
+        const headerElement = document.getElementById(
+            resizingZoneData.rowType === 'topRow' ? 'departmentZoneHeaderTop' : 'departmentZoneHeaderBottom'
+        );
+        
+        if (!headerElement) return;
+        
+        const headerRect = headerElement.getBoundingClientRect();
+        const seatWidth = headerRect.width / seatsPerRow;
+        const seatsDelta = Math.round(deltaX / seatWidth);
+        
+        const zone = resizingZoneData.originalZone;
+        const zones = departmentZoneSettings[resizingZoneData.rowType];
+        
+        let newStartIndex = zone.startSeatIndex;
+        let newEndIndex = zone.endSeatIndex;
+        
+        if (resizingZoneData.side === 'left') {
+            newStartIndex = Math.max(0, zone.startSeatIndex + seatsDelta);
+            newStartIndex = Math.min(newStartIndex, zone.endSeatIndex);
+        } else {
+            newEndIndex = Math.min(seatsPerRow - 1, zone.endSeatIndex + seatsDelta);
+            newEndIndex = Math.max(newEndIndex, zone.startSeatIndex);
+        }
+        
+        // 衝突検出と自動縮小
+        const { adjustedStart, adjustedEnd } = resolveZoneCollisions(
+            resizingZoneData.zoneIndex,
+            resizingZoneData.rowType,
+            newStartIndex,
+            newEndIndex
+        );
+        
+        // 更新されたゾーンを適用
+        zones[resizingZoneData.zoneIndex] = {
+            ...zone,
+            startSeatIndex: adjustedStart,
+            endSeatIndex: adjustedEnd
+        };
+        
+        renderDepartmentZoneHeaders();
+    }
+
+    function handleResizeEnd(e) {
+        if (!isResizingZone) return;
+        
+        if (resizingZoneData?.handle) {
+            resizingZoneData.handle.classList.remove('active');
+        }
+        
+        isResizingZone = false;
+        resizingZoneData = null;
+        document.body.style.cursor = '';
+        
+        // フィードバックメッセージ表示
+        showFeedbackMessage("部署範囲を変更しました。サーバ保存または下書き保存を行ってください。", false);
+    }
+
+    function resolveZoneCollisions(excludeIndex, rowType, newStart, newEnd) {
+        const zones = departmentZoneSettings[rowType];
+        let adjustedStart = newStart;
+        let adjustedEnd = newEnd;
+        
+        // 他のゾーンとの衝突をチェック
+        zones.forEach((otherZone, index) => {
+            if (index === excludeIndex) return;
+            
+            const otherStart = otherZone.startSeatIndex;
+            const otherEnd = otherZone.endSeatIndex;
+            
+            // 新しい範囲が他のゾーンと重複する場合
+            if (!(adjustedEnd < otherStart || adjustedStart > otherEnd)) {
+                // 左側のハンドルを動かしている場合
+                if (adjustedStart <= otherEnd && adjustedStart >= otherStart) {
+                    // 他のゾーンの右端を縮小
+                    zones[index] = {
+                        ...otherZone,
+                        endSeatIndex: Math.max(otherStart, adjustedStart - 1)
+                    };
+                }
+                
+                // 右側のハンドルを動かしている場合
+                if (adjustedEnd >= otherStart && adjustedEnd <= otherEnd) {
+                    // 他のゾーンの左端を縮小
+                    zones[index] = {
+                        ...otherZone,
+                        startSeatIndex: Math.min(otherEnd, adjustedEnd + 1)
+                    };
+                }
+                
+                // 完全に覆い隠す場合は、他のゾーンを最小サイズに縮小
+                if (adjustedStart <= otherStart && adjustedEnd >= otherEnd) {
+                    zones[index] = {
+                        ...otherZone,
+                        startSeatIndex: otherStart,
+                        endSeatIndex: otherStart
+                    };
+                }
+            }
+        });
+        
+        return { adjustedStart, adjustedEnd };
+    }
+
+    // --- 部署ゾーンクリック用ドロップダウン機能 ---
+    let currentDropdownData = null; // 現在のドロップダウンデータ { rowType, zoneIndex, originalDeptName }
+    
+    function initializeDeptZoneClickDropdown() {
+        const dropdown = document.getElementById('deptZoneClickDropdown');
+        const select = document.getElementById('deptZoneClickSelect');
+        const cancelBtn = document.getElementById('deptZoneClickCancel');
+        const confirmBtn = document.getElementById('deptZoneClickConfirm');
+        
+        if (!dropdown || !select || !cancelBtn || !confirmBtn) {
+            console.error('部署ゾーンクリック用ドロップダウン要素が見つかりません');
+            return;
+        }
+        
+        // キャンセルボタンのイベント
+        cancelBtn.addEventListener('click', hideDeptZoneClickDropdown);
+        
+        // 確定ボタンのイベント
+        confirmBtn.addEventListener('click', handleDeptZoneChange);
+        
+        // 外部クリック時にドロップダウンを閉じる
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target) && dropdown.style.display !== 'none') {
+                hideDeptZoneClickDropdown();
+            }
+        });
+        
+        // ESCキーでドロップダウンを閉じる
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && dropdown.style.display !== 'none') {
+                hideDeptZoneClickDropdown();
+            }
+        });
+    }
+    
+    function showDeptZoneClickDropdown(event, rowType, zoneIndex) {
+        const dropdown = document.getElementById('deptZoneClickDropdown');
+        const select = document.getElementById('deptZoneClickSelect');
+        
+        if (!dropdown || !select) return;
+        
+        // 現在のゾーン情報を取得
+        const currentZone = departmentZoneSettings[rowType]?.[zoneIndex];
+        if (!currentZone) return;
+        
+        // ドロップダウンデータを保存
+        currentDropdownData = {
+            rowType,
+            zoneIndex,
+            originalDeptName: currentZone.deptName
+        };
+        
+        // 部署選択肢を設定
+        populateDeptZoneClickSelect(select, currentZone.deptName);
+        
+        // ドロップダウンの位置を設定
+        const rect = event.target.getBoundingClientRect();
+        dropdown.style.left = `${rect.left + window.scrollX}px`;
+        dropdown.style.top = `${rect.bottom + window.scrollY + 5}px`;
+        
+        // ドロップダウンを表示
+        dropdown.style.display = 'block';
+        select.focus();
+        
+        event.stopPropagation();
+    }
+    
+    function populateDeptZoneClickSelect(select, currentDeptName) {
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">-- 部署を選択 --</option>';
+        
+        // 全部署を取得
+        const depts = new Set(Object.values(cardDB).map(emp => emp?.dept).filter(Boolean));
+        
+        if (depts.size === 0) {
+            select.add(new Option("利用可能な部署なし", ""));
+            return;
+        }
+        
+        // 部署をソートして選択肢に追加
+        Array.from(depts).sort().forEach(dept => {
+            const option = new Option(dept, dept);
+            if (dept === currentDeptName) {
+                option.selected = true;
+            }
+            select.add(option);
+        });
+    }
+    
+    function hideDeptZoneClickDropdown() {
+        const dropdown = document.getElementById('deptZoneClickDropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+        currentDropdownData = null;
+    }
+    
+    function handleDeptZoneChange() {
+        const select = document.getElementById('deptZoneClickSelect');
+        
+        if (!select || !currentDropdownData) return;
+        
+        const newDeptName = select.value;
+        if (!newDeptName) {
+            showFeedback('部署を選択してください', 'error');
+            return;
+        }
+        
+        const { rowType, zoneIndex, originalDeptName } = currentDropdownData;
+        
+        // 同じ部署名の場合は何もしない
+        if (newDeptName === originalDeptName) {
+            hideDeptZoneClickDropdown();
+            return;
+        }
+        
+        // 部署名を変更
+        if (departmentZoneSettings[rowType] && departmentZoneSettings[rowType][zoneIndex]) {
+            departmentZoneSettings[rowType][zoneIndex].deptName = newDeptName;
+            
+            // 部署に対応する色を自動設定
+            const newColor = departmentColorDefaults[newDeptName] || departmentColorDefaults['unknown'] || '#FFDDC1';
+            departmentZoneSettings[rowType][zoneIndex].color = newColor;
+            
+            // 表示を更新
+            renderDepartmentZoneHeaders();
+            
+            // フィードバック表示
+            showFeedback(`部署を「${originalDeptName}」から「${newDeptName}」に変更しました`, 'success');
+        }
+        
+        hideDeptZoneClickDropdown();
+    }
+
+    // リサイズ機能を初期化
+    initializeDeptZoneResize();
+    initializeDeptZoneClickDropdown();
+    
+    console.log('=== Script execution completed successfully ===');
+    } catch (error) {
+        console.error('=== Script execution error ===', error);
+        console.error('Error stack:', error.stack);
     }
 });

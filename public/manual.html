@@ -394,6 +394,8 @@
                 <li><a href="#master-data"><i class="fas fa-database"></i> マスタデータ管理</a></li>
                 <li><a href="#save-load"><i class="fas fa-save"></i> 保存と読込</a></li>
                 <li><a href="#print"><i class="fas fa-print"></i> 印刷機能</a></li>
+                <li><a href="#advanced-features"><i class="fas fa-cogs"></i> 高度な機能</a></li>
+                <li><a href="#shortcuts"><i class="fas fa-keyboard"></i> キーボードショートカット</a></li>
                 <li><a href="#troubleshooting"><i class="fas fa-question-circle"></i> よくある質問</a></li>
             </ul>
         </nav>
@@ -595,8 +597,8 @@
 
             <div class="step">
                 <div class="step-number">2</div>
-                <h4>「戻す」ボタンをクリック</h4>
-                <p>選択された座席に表示される赤い「戻す」ボタンをクリックします。</p>
+                <h4>「取り除く」ボタンをクリック</h4>
+                <p>選択された座席に表示される赤い「取り除く」ボタンをクリックします。</p>
             </div>
 
             <div class="step">
@@ -775,6 +777,43 @@
                 <i class="fas fa-exclamation-triangle"></i>
                 <div>
                     <strong>注意：</strong> サーバ保存を行うと、他の人の作業内容が上書きされる可能性があります。ただし、同時編集時は競合を自動検出し、最新のデータが読み込まれるので安全です。保存前に確認しましょう。
+                </div>
+            </div>
+
+            <h3><i class="fas fa-shield-alt"></i> 同時編集の競合検出機能</h3>
+            <p>複数の人が同時に座席配置を編集している場合、データの競合を自動的に検出し、安全に作業を続けられます。</p>
+            
+            <div class="step">
+                <div class="step-number">1</div>
+                <h4>競合検出の仕組み</h4>
+                <p>システムは「バージョン管理」機能により、データが変更されるたびにバージョン番号を更新します。保存時に他の人がデータを変更していた場合、競合として検出されます。</p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <h4>競合が発生した場合の対処</h4>
+                <p>競合が検出されると、以下のメッセージが表示されます：</p>
+                <ul>
+                    <li><strong>「データが他のユーザーによって更新されました」</strong></li>
+                    <li>自動的に最新のデータが読み込まれます</li>
+                    <li>あなたの変更内容は一時的に保持されます</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <h4>競合解決の手順</h4>
+                <ol>
+                    <li>最新のデータを確認し、他の人の変更内容を把握する</li>
+                    <li>必要に応じて、あなたの変更を再度適用する</li>
+                    <li>改めて「サーバ保存」をクリックする</li>
+                </ol>
+            </div>
+
+            <div class="alert info">
+                <i class="fas fa-users"></i>
+                <div>
+                    <strong>協働のコツ：</strong> 複数人で作業する場合は、事前に担当フロアや担当部署を決めておくと競合を減らせます。また、頻繁に「サーバ読込」で最新状態を確認することをお勧めします。
                 </div>
             </div>
         </section>
@@ -984,6 +1023,44 @@
 
             <h3><i class="fas fa-filter"></i> 部署フィルター</h3>
             <p>左側パネルの部署選択で、特定の部署の社員のみを表示できます。大人数の配置作業時に便利です。</p>
+
+            <h3><i class="fas fa-layer-group"></i> 部署ゾーン機能</h3>
+            <p>フロアの上段・下段に部署ごとの色分けゾーンを設定できます。組織の配置を視覚的に分かりやすくします。</p>
+            
+            <div class="step">
+                <div class="step-number">1</div>
+                <h4>部署ゾーン設定を開く</h4>
+                <p>右下の歯車アイコンから「部署ゾーン」ボタンをクリックします。部署ゾーン設定画面が開きます。</p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <h4>ゾーンの範囲を設定</h4>
+                <p>上段・下段それぞれに対して、部署の範囲を設定できます。スライダーで島の範囲を調整します。</p>
+                <ul>
+                    <li><strong>上段ゾーン：</strong> フロアの上部分（1行目）の部署範囲</li>
+                    <li><strong>下段ゾーン：</strong> フロアの下部分（2行目）の部署範囲</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <h4>部署を選択</h4>
+                <p>各ゾーンで表示する部署をドロップダウンから選択します。選択した部署の色でゾーンが色分けされます。</p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">4</div>
+                <h4>境界の調整</h4>
+                <p>ゾーンの境界線をドラッグして、より細かく範囲を調整できます。重複する範囲は自動的に調整されます。</p>
+            </div>
+
+            <div class="alert info">
+                <i class="fas fa-palette"></i>
+                <div>
+                    <strong>色分けのヒント：</strong> 部署ゾーンの色は、マスタデータで設定された部署色が使用されます。見やすい配色で組織の配置を一目で把握できます。
+                </div>
+            </div>
 
             <div class="alert info">
                 <i class="fas fa-graduation-cap"></i>
