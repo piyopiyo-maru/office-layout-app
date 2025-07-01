@@ -39,6 +39,267 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isDragging = false; // ドラッグ操作中かどうかのフラグ
     let mousedownOnDraggable = null; // mousedownされたドラッグ可能要素を一時保持
 
+    // --- 動的色生成システム ---
+    
+    // 職種・部署カテゴリーに基づく色のベースマッピング
+    const departmentColorMapping = {
+        // ITエンジニアリング系 - 青系
+        'it': { base: [52, 152, 219], keywords: ['IT', 'システム', 'エンジニア', 'テクニカル', 'インフラ', 'クラウド'] },
+        
+        // 財務・会計系 - 緑系
+        'finance': { base: [46, 204, 113], keywords: ['財務', '会計', 'ＦＸ', '経理'] },
+        
+        // 税務系 - 黄色系
+        'tax': { base: [241, 196, 15], keywords: ['税務', '税理'] },
+        
+        // 給与・人事系 - 紫系
+        'hr': { base: [155, 89, 182], keywords: ['給与', '人事', 'ＰＸ', '労務'] },
+        
+        // サポート・カスタマー系 - オレンジ系
+        'support': { base: [230, 126, 34], keywords: ['サポート', 'カスタマー', 'ヘルプ', 'サービス'] },
+        
+        // 営業・セールス系 - 赤系
+        'sales': { base: [231, 76, 60], keywords: ['営業', 'セールス', '販売', 'マーケティング'] },
+        
+        // 管理・企画系 - 青紫系
+        'management': { base: [142, 68, 173], keywords: ['管理', '企画', '総務', '経営', 'センター長', '部門長', '課長', '主任'] },
+        
+        // その他・デフォルト - グレー系
+        'other': { base: [149, 165, 166], keywords: [] }
+    };
+
+    // 部署・チーム名から適切な色カテゴリーを判定
+    function categorizeTeam(deptName, teamName, title) {
+        const text = `${deptName || ''} ${teamName || ''} ${title || ''}`.toLowerCase();
+        
+        for (const [category, config] of Object.entries(departmentColorMapping)) {
+            if (category === 'other') continue;
+            
+            for (const keyword of config.keywords) {
+                if (text.includes(keyword.toLowerCase())) {
+                    return category;
+                }
+            }
+        }
+        
+        return 'other';
+    }
+
+    // HSL色空間での明度調整
+    function adjustBrightness(rgb, brightness) {
+        // RGBをHSLに変換
+        const [r, g, b] = rgb.map(c => c / 255);
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const diff = max - min;
+        
+        // Lightness計算
+        let l = (max + min) / 2;
+        
+        // 明度調整 (0.3 - 0.8の範囲で調整)
+        l = 0.3 + (brightness * 0.5);
+        
+        // Saturation計算
+        let s = 0;
+        if (diff !== 0) {
+            s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
+        }
+        
+        // Hue計算
+        let h = 0;
+        if (diff !== 0) {
+            switch (max) {
+                case r: h = ((g - b) / diff + (g < b ? 6 : 0)) / 6; break;
+                case g: h = ((b - r) / diff + 2) / 6; break;
+                case b: h = ((r - g) / diff + 4) / 6; break;
+            }
+        }
+        
+        // HSLからRGBに戻す
+        return hslToRgb(h * 360, s * 100, l * 100);
+    }
+
+    // HSLからRGBへの変換
+    function hslToRgb(h, s, l) {
+        h /= 360;
+        s /= 100;
+        l /= 100;
+        
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((h * 6) % 2 - 1));
+        const m = l - c / 2;
+        
+        let r, g, b;
+        
+        if (h < 1/6) { [r, g, b] = [c, x, 0]; }
+        else if (h < 2/6) { [r, g, b] = [x, c, 0]; }
+        else if (h < 3/6) { [r, g, b] = [0, c, x]; }
+        else if (h < 4/6) { [r, g, b] = [0, x, c]; }
+        else if (h < 5/6) { [r, g, b] = [x, 0, c]; }
+        else { [r, g, b] = [c, 0, x]; }
+        
+        return [
+            Math.round((r + m) * 255),
+            Math.round((g + m) * 255),
+            Math.round((b + m) * 255)
+        ];
+    }
+
+    // チーム名のハッシュ値を生成（一意性確保）
+    function hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // 32bit整数に変換
+        }
+        return Math.abs(hash);
+    }
+
+    // 動的に色を生成する関数
+    function generateDynamicColor(deptName, teamName, title) {
+        // カテゴリー判定
+        const category = categorizeTeam(deptName, teamName, title);
+        const baseColor = departmentColorMapping[category].base;
+        
+        // チーム名から明度を決定（同じチームは同じ明度）
+        const hash = hashString(teamName || deptName || 'unknown');
+        const brightness = (hash % 100) / 100; // 0-1の範囲
+        
+        // 明度調整
+        const [r, g, b] = adjustBrightness(baseColor, brightness);
+        
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // 類似色＋明度でテキスト色を生成（背景色より暗く/明るく）
+    function generateTextColor(deptName, teamName, title, backgroundColor) {
+        // カテゴリー判定（背景色と同じ）
+        const category = categorizeTeam(deptName, teamName, title);
+        const baseColor = departmentColorMapping[category].base;
+        
+        // 背景色の明度を取得
+        const bgRgb = backgroundColor.match(/\d+/g);
+        if (!bgRgb) return '#000000';
+        
+        const [bgR, bgG, bgB] = bgRgb.map(Number);
+        const bgLuminance = (0.299 * bgR + 0.587 * bgG + 0.114 * bgB) / 255;
+        
+        // 背景が明るい場合は暗いテキスト、暗い場合は明るいテキスト
+        const textBrightness = bgLuminance > 0.5 ? 0.1 : 0.9; // 対比を強く
+        
+        // 同じ色相で明度違いのテキスト色を生成
+        const [r, g, b] = adjustBrightness(baseColor, textBrightness);
+        
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // 背景色から類似色＋明度でテキスト色を動的生成
+    function generateTextColorFromBase(backgroundColor) {
+        // 背景色からRGB値を抽出
+        let rgb;
+        if (backgroundColor.startsWith('#')) {
+            // HEXからRGBに変換
+            const hex = backgroundColor.replace('#', '');
+            if (hex.length === 3) {
+                rgb = [
+                    parseInt(hex[0] + hex[0], 16),
+                    parseInt(hex[1] + hex[1], 16),
+                    parseInt(hex[2] + hex[2], 16)
+                ];
+            } else {
+                rgb = [
+                    parseInt(hex.substr(0, 2), 16),
+                    parseInt(hex.substr(2, 2), 16),
+                    parseInt(hex.substr(4, 2), 16)
+                ];
+            }
+        } else if (backgroundColor.includes('rgb')) {
+            rgb = backgroundColor.match(/\d+/g).map(Number);
+        } else {
+            return getContrastTextColor(backgroundColor);
+        }
+        
+        const [r, g, b] = rgb;
+        
+        // RGBからHSLに変換
+        const [hue, saturation, lightness] = rgbToHsl(r, g, b);
+        
+        // 背景の明度に基づいてテキストの明度を決定
+        let textLightness;
+        if (lightness > 0.7) {
+            // 非常に明るい背景 → 濃い色のテキスト
+            textLightness = Math.max(0.1, lightness - 0.6);
+        } else if (lightness > 0.5) {
+            // 明るい背景 → やや濃いテキスト  
+            textLightness = Math.max(0.15, lightness - 0.45);
+        } else if (lightness > 0.3) {
+            // 中程度の背景 → 明るいテキスト
+            textLightness = Math.min(0.9, lightness + 0.45);
+        } else {
+            // 暗い背景 → 明るいテキスト
+            textLightness = Math.min(0.95, lightness + 0.6);
+        }
+        
+        // 彩度調整（背景より少し高めにして鮮やか）
+        let textSaturation = Math.min(0.8, saturation + 0.2);
+        
+        // グレー系の場合は彩度を抑える
+        if (saturation < 0.1) {
+            textSaturation = Math.min(0.3, saturation + 0.15);
+        }
+        
+        // HSLからRGBに変換してテキスト色を生成
+        const textRgb = hslToRgb(hue * 360, textSaturation * 100, textLightness * 100);
+        
+        return `rgb(${textRgb[0]}, ${textRgb[1]}, ${textRgb[2]})`;
+    }
+    
+    // RGBからHSLへの変換関数
+    function rgbToHsl(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const diff = max - min;
+        
+        let h = 0;
+        let s = 0;
+        let l = (max + min) / 2;
+        
+        if (diff !== 0) {
+            s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
+            
+            switch (max) {
+                case r: 
+                    h = (g - b) / diff + (g < b ? 6 : 0);
+                    break;
+                case g: 
+                    h = (b - r) / diff + 2;
+                    break;
+                case b: 
+                    h = (r - g) / diff + 4;
+                    break;
+            }
+            h /= 6;
+        }
+        
+        return [h, s, l];
+    }
+
+    // より洗練されたコントラスト色生成（フォールバック用）
+    function getContrastTextColor(backgroundColor) {
+        const rgb = backgroundColor.match(/\d+/g);
+        if (!rgb) return '#000000';
+        
+        const [r, g, b] = rgb.map(Number);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        
+        return luminance > 0.5 ? '#000000' : '#ffffff';
+    }
+
     // --- セキュリティ関数 ---
     function escapeHtml(unsafe) {
         if (typeof unsafe !== 'string') {
@@ -70,6 +331,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const employeeListPanel = document.getElementById('employeeList');
     const departmentFilterSelect = document.getElementById('departmentFilter');
     const resetFilterBtn = document.getElementById('resetFilterBtn');
+    const employeeSearchInput = document.getElementById('employeeSearchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
     const jsonInput = document.getElementById('jsonInput'); // 社員情報JSONアップロード用
     const topCabinetDiv = document.getElementById('topCabinet');
     const sideCabinetsContainer = document.getElementById('sideCabinetsContainer');
@@ -189,7 +452,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // 関連UIの更新
             populateDepartmentDropdown();
             populateDepartmentFilterDropdown();
-            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+            performSearch();
             renderFloor();
 
             if (!isInitialLoad) showFeedbackMessage("社員マスター情報を正常に再読み込みしました。", false);
@@ -415,7 +678,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         renderFloor();
         renderDepartmentZoneHeaders();
-        renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+        performSearch();
         updateFloorDisplayAndSwitcher();
         updatePrintHeader();
         document.body.style.backgroundColor = currentFloorId === '3F' ? '#FDFBF5' : currentFloorId === '4F' ? '#FFF0F0' : '#f5f5f5';
@@ -462,12 +725,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         return Object.keys(cardDB).filter(empNo => !assignedAcrossAllFloors.has(empNo));
     }
 
-    function renderList(filterDept = "") {
+    function renderList(filterDept = "", searchTerm = "") {
         if (!employeeListPanel) return;
         employeeListPanel.querySelectorAll('.employee-item').forEach(el => el.remove());
+        employeeListPanel.querySelectorAll('.search-no-results').forEach(el => el.remove());
+        
         let unassignedEmployees = getUnassignedList();
+        
+        // 部署フィルター適用
         if (filterDept) {
             unassignedEmployees = unassignedEmployees.filter(empNo => cardDB[empNo]?.dept === filterDept);
+        }
+        
+        // 検索フィルター適用
+        if (searchTerm) {
+            const lowerSearchTerm = searchTerm.toLowerCase();
+            unassignedEmployees = unassignedEmployees.filter(empNo => {
+                const info = cardDB[empNo];
+                if (!info) return false;
+                return (
+                    info.name?.toLowerCase().includes(lowerSearchTerm) ||
+                    info.empNo?.toLowerCase().includes(lowerSearchTerm) ||
+                    info.dept?.toLowerCase().includes(lowerSearchTerm) ||
+                    info.team?.toLowerCase().includes(lowerSearchTerm)
+                );
+            });
         }
         unassignedEmployees.forEach(empNo => {
             const info = cardDB[empNo];
@@ -481,8 +763,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const nameSpan = document.createElement('span');
             nameSpan.textContent = ` ${info.empNo} ${info.name} (${info.dept || '部署未定'}) (${info.team || 'チーム未定'})`;
             div.appendChild(nameSpan);
+            
+            // 既存の設定ファイルの色を優先使用
             const teamColor = teamColorDefaults[info.team] || teamColorDefaults['unknown_team'] || '#ffffff';
             div.style.backgroundColor = teamColor;
+            
+            // テキスト色を背景色から類似色＋明度で動的生成
+            const textColor = generateTextColorFromBase(teamColor);
+            div.style.color = textColor;
 
             if (currentAppMode === 'admin') {
                 div.draggable = true;
@@ -503,6 +791,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
             employeeListPanel.appendChild(div);
         });
+        
+        // 検索結果がない場合の表示
+        if (unassignedEmployees.length === 0 && (searchTerm || filterDept)) {
+            const noResultsDiv = document.createElement('div');
+            noResultsDiv.className = 'search-no-results';
+            if (searchTerm && filterDept) {
+                noResultsDiv.textContent = `「${searchTerm}」で「${filterDept}」に該当する未配置社員が見つかりません`;
+            } else if (searchTerm) {
+                noResultsDiv.textContent = `「${searchTerm}」に該当する未配置社員が見つかりません`;
+            } else if (filterDept) {
+                noResultsDiv.textContent = `「${filterDept}」の未配置社員が見つかりません`;
+            }
+            employeeListPanel.appendChild(noResultsDiv);
+        }
+        
         updateUIBasedOnMode();
     }
 
@@ -513,16 +816,75 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 安全な方法でオプションをクリア
         departmentFilterSelect.innerHTML = '';
         
-        // デフォルトオプションを安全に追加
-        const defaultOption = new Option('すべての部署', '');
+        // 未配置社員リストを取得
+        const unassignedEmployees = getUnassignedList();
+        
+        // 部署別人数をカウント
+        const deptCounts = {};
+        unassignedEmployees.forEach(empNo => {
+            const dept = cardDB[empNo]?.dept || '部署未定';
+            deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+        });
+        
+        // 総数を計算
+        const totalCount = unassignedEmployees.length;
+        
+        // デフォルトオプションに総人数を表示
+        const defaultOption = new Option(`すべての部署 (${totalCount}名)`, '');
         departmentFilterSelect.add(defaultOption);
         
-        const depts = new Set(Object.values(cardDB).map(emp => emp?.dept).filter(Boolean));
-        Array.from(depts).sort().forEach(dept => {
-            // new Option()を使用することで自動的にエスケープされる
-            departmentFilterSelect.add(new Option(dept, dept));
+        // 部署オプションを人数付きで追加
+        const sortedDepts = Object.keys(deptCounts).sort();
+        sortedDepts.forEach(dept => {
+            const count = deptCounts[dept];
+            const option = new Option(`${dept} (${count}名)`, dept);
+            departmentFilterSelect.add(option);
         });
+        
         departmentFilterSelect.value = existingValue;
+    }
+
+    // 検索とフィルターを統合的に処理する関数
+    function performSearch() {
+        const searchTerm = employeeSearchInput?.value.trim() || '';
+        const filterDept = departmentFilterSelect?.value || '';
+        
+        // クリアボタンの表示/非表示
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = searchTerm ? 'block' : 'none';
+        }
+        
+        renderList(filterDept, searchTerm);
+    }
+
+    // 検索をクリアする関数
+    function clearSearch() {
+        if (employeeSearchInput) {
+            employeeSearchInput.value = '';
+        }
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = 'none';
+        }
+        performSearch();
+        
+        // フォーカスを検索ボックスに戻す
+        if (employeeSearchInput) {
+            employeeSearchInput.focus();
+        }
+    }
+
+    // フィルターをリセットする関数
+    function resetAllFilters() {
+        if (employeeSearchInput) {
+            employeeSearchInput.value = '';
+        }
+        if (departmentFilterSelect) {
+            departmentFilterSelect.value = '';
+        }
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = 'none';
+        }
+        performSearch();
     }
 
     function selectEmployee(div, empNo) {
@@ -578,8 +940,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         card.dataset.empNo = empNo;
+        
+        // 既存の設定ファイルの色を優先使用
         const teamColor = teamColorDefaults[info.team] || teamColorDefaults['unknown_team'] || '#eeeeee';
         card.style.backgroundColor = teamColor;
+        
+        // テキスト色を背景色から類似色＋明度で動的生成
+        const textColor = generateTextColorFromBase(teamColor);
+        card.style.color = textColor;
 
         // 安全な方法で各要素を作成
         if (info.title && info.title !== "0" && info.title !== "一般") {
@@ -640,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         allFloorData[currentFloorId].seatMap[isl][r][c] = null;
                     }
                 }
-                renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+                performSearch();
                 renderFloor();
             };
         });
@@ -687,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 selectedCell.classList.remove('selected');
                 selectedCell = null;
             }
-            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+            performSearch();
             renderFloor();
             return;
         }
@@ -953,7 +1321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 管理モードに切り替えた場合、renderListとrenderFloorを呼び出して
         // draggable属性やイベントリスナーが正しく設定されるようにする
         renderFloor();
-        renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+        performSearch();
     }
 
     function updateUIBasedOnMode() {
@@ -1052,7 +1420,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 block.className = 'dept-zone-block';
                 block.textContent = zone.deptName;
                 block.style.gridColumn = `${zone.startSeatIndex + 1} / span ${Math.max(1, zone.endSeatIndex - zone.startSeatIndex + 1)}`;
-                block.style.backgroundColor = zone.color || '#f0f0f0';
+                const backgroundColor = zone.color || '#f0f0f0';
+                block.style.backgroundColor = backgroundColor;
+                
+                // 部署ゾーンのテキスト色を背景色から動的生成
+                const textColor = generateTextColorFromBase(backgroundColor);
+                block.style.color = textColor;
+                
                 block.dataset.zoneIndex = index;
                 block.dataset.rowType = 'topRow';
                 
@@ -1110,7 +1484,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 block.className = 'dept-zone-block';
                 block.textContent = zone.deptName;
                 block.style.gridColumn = `${zone.startSeatIndex + 1} / span ${Math.max(1, zone.endSeatIndex - zone.startSeatIndex + 1)}`;
-                block.style.backgroundColor = zone.color || '#f0f0f0';
+                const backgroundColor = zone.color || '#f0f0f0';
+                block.style.backgroundColor = backgroundColor;
+                
+                // 部署ゾーンのテキスト色を背景色から動的生成
+                const textColor = generateTextColorFromBase(backgroundColor);
+                block.style.color = textColor;
+                
                 block.dataset.zoneIndex = index;
                 block.dataset.rowType = 'bottomRow';
                 
@@ -1487,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             showFeedbackMessage(`${cardDB[draggedEmpNo]?.name || draggedEmpNo} さんを移動しました。`, false);
             renderFloor();
-            renderList(departmentFilterSelect ? departmentFilterSelect.value : "");
+            performSearch();
             deselectAll();
         }
     }
@@ -1655,12 +2035,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showFeedbackMessage("閲覧モードに戻りました。", false);
             };
         }
-        if (departmentFilterSelect) departmentFilterSelect.onchange = (event) => renderList(event.target.value);
+        if (departmentFilterSelect) {
+            departmentFilterSelect.onchange = () => performSearch();
+        }
         if (resetFilterBtn) {
-            resetFilterBtn.onclick = () => {
-                if (departmentFilterSelect) departmentFilterSelect.value = "";
-                renderList();
-            };
+            resetFilterBtn.onclick = resetAllFilters;
+        }
+        
+        // 検索機能のイベントリスナー
+        if (employeeSearchInput) {
+            // リアルタイム検索（入力時）
+            employeeSearchInput.addEventListener('input', performSearch);
+            
+            // Enterキーでの検索実行
+            employeeSearchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    performSearch();
+                }
+            });
+        }
+        
+        if (clearSearchBtn) {
+            clearSearchBtn.onclick = clearSearch;
         }
         if (closeDeptZoneModalBtn) closeDeptZoneModalBtn.onclick = () => { if (deptZoneModal) deptZoneModal.style.display = "none"; };
         if (cancelDeptZoneSettingsBtn) cancelDeptZoneSettingsBtn.onclick = () => { if (deptZoneModal) deptZoneModal.style.display = "none"; };
@@ -1805,7 +2202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         populateDepartmentDropdown();
                         populateDepartmentFilterDropdown();
-                        renderList(departmentFilterSelect.value);
+                        performSearch();
                         renderFloor();
                         showFeedbackMessage("ファイルからマスターデータを適用しました。変更を永続化するには「サーバに上書保存」を実行してください。", false);
                     } catch(e) {

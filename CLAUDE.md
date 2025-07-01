@@ -29,9 +29,27 @@
 - `npm start` - ポート9000でExpressサーバーを開始
 - `node server.js` - サーバーを開始する別の方法
 
-### Docker
+### Docker（推奨）
 - `docker build -t office-layout-app .` - Dockerイメージをビルド
 - `docker run -p 9000:9000 office-layout-app` - コンテナを実行
+
+### 確実な再起動方法（ファイル変更後）
+```bash
+# 1. Dockerイメージを再ビルド
+docker build -t office-layout-app .
+
+# 2. 既存コンテナを停止・削除
+docker stop office-layout-container 2>/dev/null || true
+docker rm office-layout-container 2>/dev/null || true
+
+# 3. 新しいコンテナを起動
+docker run -d -p 9000:9000 \
+  -v /opt/office-layout-app/data:/usr/src/app/data \
+  --name office-layout-container \
+  office-layout-app
+```
+
+**重要**: ファイル変更後は必ずDockerコンテナを再起動してください。`npm start`だけではファイルキャッシュの問題で変更が反映されない場合があります。
 
 ## アーキテクチャ
 

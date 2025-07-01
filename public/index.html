@@ -58,8 +58,17 @@
         <div class="side-panel" id="employeeList">
         <h2><i class="fas fa-users"></i> 未配置社員</h2>
         <div id="employeeFilterContainer">
-        <select id="departmentFilter"></select>
-        <button id="resetFilterBtn" title="フィルター解除">🔄</button>
+        <div class="filter-row">
+            <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="employeeSearchInput" placeholder="名前・社員番号・部署で検索..." autocomplete="off">
+                <button id="clearSearchBtn" title="検索クリア" style="display: none;">×</button>
+            </div>
+        </div>
+        <div class="filter-row">
+            <select id="departmentFilter"></select>
+            <button id="resetFilterBtn" title="フィルター解除">🔄</button>
+        </div>
         </div>
         <input type="file" id="jsonInput" accept="application/json">
         </div>

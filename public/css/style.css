@@ -314,7 +314,7 @@
     }
     .dept-zone-block {
         background-color: #f0f0f0;
-        color: #333;
+        /* color: #333; 動的色生成のためコメントアウト */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -553,7 +553,7 @@
       justify-content: space-around;
       padding: 5px 2px;
       font-size: 0.7em;
-      color: #333;
+      /* color: #333; 動的色生成のためコメントアウト */
       border-radius: 5px;
       background-color: #eeeeee;
     }
@@ -563,11 +563,14 @@
         width: 100%;
         overflow-wrap: break-word;
     }
-    .seat-card strong { font-size: 0.9em; color: #000; }
+    .seat-card strong { 
+        font-size: 0.9em; 
+        /* color: #000; 動的色生成のためコメントアウト */
+    }
     .seat-card .employee-name {
         font-size: 1.2em;
         font-weight: bold;
-        color: #000;
+        /* color: #000; 動的色生成のためコメントアウト */
         margin-bottom: 2px;
     }
 
@@ -948,14 +951,14 @@
       }
 
     .seat-card {
-      color: #000 !important;
+      /* color: #000 !important; 動的色生成のためコメントアウト */
       font-size: 10pt !important;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
 
     .seat-cell {
-      color: #000 !important;
+      /* color: #000 !important; 動的色生成のためコメントアウト */
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -1353,4 +1356,135 @@ body.admin-mode .dept-zone-block:hover {
     opacity: 0.8;
     transform: scale(1.02);
     transition: all 0.2s ease;
+}
+
+/* 未配置社員リスト検索機能 */
+.search-container {
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.search-container .search-icon {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    font-size: 14px;
+    z-index: 2;
+}
+
+#employeeSearchInput {
+    width: 100%;
+    padding: 8px 30px 8px 28px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#employeeSearchInput:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+#employeeSearchInput::placeholder {
+    color: #999;
+    font-size: 12px;
+}
+
+#clearSearchBtn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 50%;
+    line-height: 1;
+    z-index: 2;
+}
+
+#clearSearchBtn:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+/* 部署フィルターの改善 - 2行レイアウト */
+.side-panel #employeeFilterContainer {
+    margin-bottom: 12px;
+    display: block !important; /* 既存のflexレイアウトを無効化 */
+    align-items: unset !important; /* flexのalign-itemsも無効化 */
+    gap: unset !important; /* flexのgapも無効化 */
+}
+
+.filter-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+    align-items: center;
+    width: 100%;
+}
+
+.filter-row:last-child {
+    margin-bottom: 0;
+}
+
+#departmentFilter {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    min-width: 0; /* flexアイテムの縮小を許可 */
+}
+
+#departmentFilter:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+#resetFilterBtn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0; /* サイズ固定 */
+}
+
+#resetFilterBtn:hover {
+    background-color: #f0f0f0;
+    border-color: #bbb;
+}
+
+/* 検索結果の表示改善 */
+.employee-item.search-highlight {
+    animation: highlightFade 2s ease-out;
+}
+
+@keyframes highlightFade {
+    0% { background-color: #fffacd; }
+    100% { background-color: inherit; }
+}
+
+.search-no-results {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 20px 10px;
+    font-size: 13px;
 }
