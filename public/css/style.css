@@ -574,6 +574,22 @@
         margin-bottom: 2px;
     }
 
+    /* 設備（社員番号0）用のスタイル */
+    .seat-card.equipment-card {
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .seat-card.equipment-card .employee-name {
+        font-size: 1.1em;
+        font-weight: bold;
+        padding: 10px 5px;
+        margin: 0;
+        width: 100%;
+        text-align: center;
+    }
+
     .return-btn {
       position: absolute;
       top: 5px;

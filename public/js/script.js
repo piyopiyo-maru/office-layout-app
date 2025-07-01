@@ -949,30 +949,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         const textColor = generateTextColorFromBase(teamColor);
         card.style.color = textColor;
 
-        // 安全な方法で各要素を作成
-        if (info.title && info.title !== "0" && info.title !== "一般") {
-            const titleDiv = createSafeTextElement('div', info.title);
-            card.appendChild(titleDiv);
-        } else if (info.title === "0" || info.title === "一般") {
-            const emptyDiv = document.createElement('div');
-            emptyDiv.innerHTML = '&nbsp;'; // これは安全
-            card.appendChild(emptyDiv);
+        // 社員番号が"0"の場合は設備として扱い、名前のみ表示
+        if (info.empNo === "0") {
+            // 設備（共有PCなど）の場合は名前のみ表示
+            card.classList.add('equipment-card');
+            const nameDiv = createSafeTextElement('div', info.name, 'employee-name');
+            card.appendChild(nameDiv);
+        } else {
+            // 一般社員の場合は従来通りの表示
+            // 安全な方法で各要素を作成
+            if (info.title && info.title !== "0" && info.title !== "一般") {
+                const titleDiv = createSafeTextElement('div', info.title);
+                card.appendChild(titleDiv);
+            } else if (info.title === "0" || info.title === "一般") {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.innerHTML = '&nbsp;'; // これは安全
+                card.appendChild(emptyDiv);
+            }
+
+            const empNoDiv = document.createElement('div');
+            const strongElement = document.createElement('strong');
+            strongElement.textContent = info.empNo; // XSS対策: textContentを使用
+            empNoDiv.appendChild(strongElement);
+            card.appendChild(empNoDiv);
+
+            const nameDiv = createSafeTextElement('div', info.name, 'employee-name');
+            card.appendChild(nameDiv);
+
+            const extDiv = createSafeTextElement('div', `内線: ${info.ext || '-'}`);
+            card.appendChild(extDiv);
+
+            const telDiv = createSafeTextElement('div', `Tel.: ${info.ctstage || '-'}`);
+            card.appendChild(telDiv);
         }
-
-        const empNoDiv = document.createElement('div');
-        const strongElement = document.createElement('strong');
-        strongElement.textContent = info.empNo; // XSS対策: textContentを使用
-        empNoDiv.appendChild(strongElement);
-        card.appendChild(empNoDiv);
-
-        const nameDiv = createSafeTextElement('div', info.name, 'employee-name');
-        card.appendChild(nameDiv);
-
-        const extDiv = createSafeTextElement('div', `内線: ${info.ext || '-'}`);
-        card.appendChild(extDiv);
-
-        const telDiv = createSafeTextElement('div', `Tel.: ${info.ctstage || '-'}`);
-        card.appendChild(telDiv);
 
         if (currentAppMode === 'admin') {
             card.draggable = true;
@@ -1153,6 +1162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         parseInt(selectedCell.dataset.row, 10) === r &&
                         parseInt(selectedCell.dataset.col, 10) === c) {
                         cell.classList.add('selected');
+                        selectedCell = cell; // 新しい要素に更新
                     }
                     if (isMerged) {
                         cell.classList.add('merged-seat');
@@ -1191,6 +1201,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                         cell.textContent = '';
                     }
                     cell.onclick = () => onCellClick(cell);
+                    
+                    // マウスが離れると選択解除
+                    cell.addEventListener('mouseleave', () => {
+                        if (selectedCell === cell) {
+                            cell.classList.remove('selected');
+                            selectedCell = null;
+                        }
+                    });
+                    
                     islandSeatsContainer.appendChild(cell);
                 }
             }
