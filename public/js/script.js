@@ -39,6 +39,388 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isDragging = false; // ドラッグ操作中かどうかのフラグ
     let mousedownOnDraggable = null; // mousedownされたドラッグ可能要素を一時保持
 
+    // --- アンドゥ/リドゥシステム ---
+    
+    // コマンドの基底クラス
+    class Command {
+        constructor(description) {
+            this.description = description;
+            this.timestamp = Date.now();
+        }
+        
+        execute() {
+            throw new Error('execute() must be implemented');
+        }
+        
+        undo() {
+            throw new Error('undo() must be implemented');
+        }
+    }
+    
+    // 座席配置コマンド
+    class SeatAssignmentCommand extends Command {
+        constructor(empNo, island, row, col, previousEmpNo = null) {
+            super(`${cardDB[empNo]?.name || empNo}を座席(${island + 1}-${row + 1}-${col + 1})に配置`);
+            this.empNo = empNo;
+            this.island = island;
+            this.row = row;
+            this.col = col;
+            this.previousEmpNo = previousEmpNo; // 元々座っていた社員
+            this.floorId = currentFloorId;
+        }
+        
+        execute() {
+            // 実際の配置処理は既存関数を使用
+            if (!seatMap || !seatMap[this.island] || !seatMap[this.island][this.row]) return false;
+            
+            this.previousEmpNo = seatMap[this.island][this.row][this.col];
+            seatMap[this.island][this.row][this.col] = this.empNo;
+            
+            if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                allFloorData[this.floorId].seatMap[this.island][this.row][this.col] = this.empNo;
+            }
+            
+            return true;
+        }
+        
+        undo() {
+            if (!seatMap || !seatMap[this.island] || !seatMap[this.island][this.row]) return false;
+            
+            seatMap[this.island][this.row][this.col] = this.previousEmpNo;
+            
+            if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                allFloorData[this.floorId].seatMap[this.island][this.row][this.col] = this.previousEmpNo;
+            }
+            
+            return true;
+        }
+    }
+    
+    // 座席削除コマンド
+    class SeatRemovalCommand extends Command {
+        constructor(island, row, col) {
+            const empNo = seatMap?.[island]?.[row]?.[col];
+            super(`座席(${island + 1}-${row + 1}-${col + 1})から${cardDB[empNo]?.name || empNo || '社員'}を削除`);
+            this.empNo = empNo;
+            this.island = island;
+            this.row = row;
+            this.col = col;
+            this.floorId = currentFloorId;
+        }
+        
+        execute() {
+            if (!seatMap || !seatMap[this.island] || !seatMap[this.island][this.row]) return false;
+            
+            this.empNo = seatMap[this.island][this.row][this.col];
+            seatMap[this.island][this.row][this.col] = null;
+            
+            if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                allFloorData[this.floorId].seatMap[this.island][this.row][this.col] = null;
+            }
+            
+            return true;
+        }
+        
+        undo() {
+            if (!seatMap || !seatMap[this.island] || !seatMap[this.island][this.row]) return false;
+            
+            seatMap[this.island][this.row][this.col] = this.empNo;
+            
+            if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                allFloorData[this.floorId].seatMap[this.island][this.row][this.col] = this.empNo;
+            }
+            
+            return true;
+        }
+    }
+    
+    // 座席移動コマンド（座席→座席、未配置→座席）
+    class SeatMoveCommand extends Command {
+        constructor(empNo, fromLocation, toIsland, toRow, toCol) {
+            const empName = cardDB[empNo]?.name || empNo;
+            const fromDesc = fromLocation.type === 'unassigned' ? '未配置リスト' : 
+                           `座席(${fromLocation.island + 1}-${fromLocation.row + 1}-${fromLocation.col + 1})`;
+            const toDesc = `座席(${toIsland + 1}-${toRow + 1}-${toCol + 1})`;
+            super(`${empName}を${fromDesc}から${toDesc}に移動`);
+            
+            this.empNo = empNo;
+            this.fromLocation = fromLocation; // { type: 'seat', island, row, col } または { type: 'unassigned' }
+            this.toIsland = toIsland;
+            this.toRow = toRow;
+            this.toCol = toCol;
+            this.replacedEmpNo = null; // 移動先にいた社員
+            this.floorId = currentFloorId;
+        }
+        
+        execute() {
+            if (!seatMap || !seatMap[this.toIsland] || !seatMap[this.toIsland][this.toRow]) return false;
+            
+            // 移動先にいる社員を記録
+            this.replacedEmpNo = seatMap[this.toIsland][this.toRow][this.toCol];
+            
+            // 移動元から削除
+            if (this.fromLocation.type === 'seat') {
+                if (seatMap[this.fromLocation.island] && seatMap[this.fromLocation.island][this.fromLocation.row]) {
+                    seatMap[this.fromLocation.island][this.fromLocation.row][this.fromLocation.col] = this.replacedEmpNo;
+                    if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                        allFloorData[this.floorId].seatMap[this.fromLocation.island][this.fromLocation.row][this.fromLocation.col] = this.replacedEmpNo;
+                    }
+                }
+            }
+            // 未配置からの場合は何もしない（元々座席にいない）
+            
+            // 移動先に配置
+            seatMap[this.toIsland][this.toRow][this.toCol] = this.empNo;
+            if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                allFloorData[this.floorId].seatMap[this.toIsland][this.toRow][this.toCol] = this.empNo;
+            }
+            
+            return true;
+        }
+        
+        undo() {
+            if (!seatMap || !seatMap[this.toIsland] || !seatMap[this.toIsland][this.toRow]) return false;
+            
+            // 移動先から削除
+            seatMap[this.toIsland][this.toRow][this.toCol] = this.replacedEmpNo;
+            if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                allFloorData[this.floorId].seatMap[this.toIsland][this.toRow][this.toCol] = this.replacedEmpNo;
+            }
+            
+            // 移動元に復元
+            if (this.fromLocation.type === 'seat') {
+                if (seatMap[this.fromLocation.island] && seatMap[this.fromLocation.island][this.fromLocation.row]) {
+                    seatMap[this.fromLocation.island][this.fromLocation.row][this.fromLocation.col] = this.empNo;
+                    if (allFloorData[this.floorId] && allFloorData[this.floorId].seatMap) {
+                        allFloorData[this.floorId].seatMap[this.fromLocation.island][this.fromLocation.row][this.fromLocation.col] = this.empNo;
+                    }
+                }
+            }
+            // 未配置への復元は何もしない（UIの更新で自動的に未配置リストに戻る）
+            
+            return true;
+        }
+    }
+    
+    // アンドゥ/リドゥマネージャー
+    class UndoRedoManager {
+        constructor(maxHistorySize = 50) {
+            this.maxHistorySize = maxHistorySize;
+            this.floorHistories = {}; // フロアごとの履歴を管理
+            this.initializeFloorHistory(currentFloorId);
+        }
+        
+        initializeFloorHistory(floorId) {
+            if (!this.floorHistories[floorId]) {
+                this.floorHistories[floorId] = {
+                    history: [],
+                    currentIndex: -1
+                };
+            }
+        }
+        
+        getCurrentHistory() {
+            this.initializeFloorHistory(currentFloorId);
+            return this.floorHistories[currentFloorId];
+        }
+        
+        executeCommand(command) {
+            if (!command || typeof command.execute !== 'function') {
+                return false;
+            }
+            
+            const result = command.execute();
+            if (!result) {
+                return false;
+            }
+            
+            const history = this.getCurrentHistory();
+            
+            // 現在位置より後の履歴を削除（新しい操作が実行されたため）
+            history.history = history.history.slice(0, history.currentIndex + 1);
+            
+            // 新しいコマンドを追加
+            history.history.push(command);
+            history.currentIndex++;
+            
+            // 履歴サイズを制限
+            if (history.history.length > this.maxHistorySize) {
+                history.history.shift();
+                history.currentIndex--;
+            }
+            
+            return true;
+        }
+        
+        undo() {
+            const history = this.getCurrentHistory();
+            
+            if (history.currentIndex < 0) {
+                return false;
+            }
+            
+            const command = history.history[history.currentIndex];
+            const result = command.undo();
+            
+            if (result) {
+                history.currentIndex--;
+                return true;
+            } else {
+                return false;
+            }
+        }
+        
+        redo() {
+            const history = this.getCurrentHistory();
+            
+            if (history.currentIndex >= history.history.length - 1) {
+                return false;
+            }
+            
+            history.currentIndex++;
+            const command = history.history[history.currentIndex];
+            const result = command.execute();
+            
+            if (result) {
+                return true;
+            } else {
+                history.currentIndex--;
+                return false;
+            }
+        }
+        
+        canUndo() {
+            const history = this.getCurrentHistory();
+            return history.currentIndex >= 0;
+        }
+        
+        canRedo() {
+            const history = this.getCurrentHistory();
+            return history.currentIndex < history.history.length - 1;
+        }
+        
+        getLastCommandDescription() {
+            const history = this.getCurrentHistory();
+            if (history.currentIndex >= 0 && history.history[history.currentIndex]) {
+                return history.history[history.currentIndex].description;
+            }
+            return null;
+        }
+        
+        getNextCommandDescription() {
+            const history = this.getCurrentHistory();
+            if (history.currentIndex < history.history.length - 1 && history.history[history.currentIndex + 1]) {
+                return history.history[history.currentIndex + 1].description;
+            }
+            return null;
+        }
+        
+        clearHistory(floorId = null) {
+            if (floorId) {
+                if (this.floorHistories[floorId]) {
+                    this.floorHistories[floorId] = {
+                        history: [],
+                        currentIndex: -1
+                    };
+                }
+            } else {
+                this.floorHistories = {};
+                this.initializeFloorHistory(currentFloorId);
+            }
+        }
+        
+        switchFloor(newFloorId) {
+            this.initializeFloorHistory(newFloorId);
+        }
+    }
+    
+    // グローバルなアンドゥ/リドゥマネージャーのインスタンス
+    let undoRedoManager = new UndoRedoManager();
+    
+    // --- アンドゥ対応のヘルパー関数 ---
+    
+    // 座席に社員を配置（アンドゥ対応）
+    function assignEmployeeToSeat(empNo, island, row, col) {
+        if (!seatMap || !seatMap[island] || !seatMap[island][row]) {
+            return false;
+        }
+        
+        // 既に誰かが座っている場合はスキップ
+        if (seatMap[island][row][col] !== null) {
+            return false;
+        }
+        
+        const command = new SeatAssignmentCommand(empNo, island, row, col);
+        const success = undoRedoManager.executeCommand(command);
+        
+        if (success) {
+            // UI更新
+            performSearch();
+            renderFloor();
+            return true;
+        }
+        return false;
+    }
+    
+    // 座席から社員を削除（アンドゥ対応）
+    function removeEmployeeFromSeat(island, row, col) {
+        if (!seatMap || !seatMap[island] || !seatMap[island][row]) {
+            return false;
+        }
+        
+        // 空席の場合はスキップ
+        if (seatMap[island][row][col] === null) {
+            return false;
+        }
+        
+        const command = new SeatRemovalCommand(island, row, col);
+        const success = undoRedoManager.executeCommand(command);
+        
+        if (success) {
+            // UI更新
+            performSearch();
+            renderFloor();
+            return true;
+        }
+        return false;
+    }
+    
+    // 社員移動（アンドゥ対応）
+    function moveEmployee(empNo, fromLocation, toIsland, toRow, toCol) {
+        if (!seatMap || !seatMap[toIsland] || !seatMap[toIsland][toRow]) {
+            return false;
+        }
+        
+        const command = new SeatMoveCommand(empNo, fromLocation, toIsland, toRow, toCol);
+        const success = undoRedoManager.executeCommand(command);
+        
+        if (success) {
+            // UI更新
+            performSearch();
+            renderFloor();
+            return true;
+        }
+        return false;
+    }
+    
+    // 座席から未配置への移動（アンドゥ対応）
+    function moveEmployeeToUnassigned(empNo, fromLocation) {
+        if (fromLocation.type !== 'seat') {
+            return false;
+        }
+        
+        const command = new SeatRemovalCommand(fromLocation.island, fromLocation.row, fromLocation.col);
+        const success = undoRedoManager.executeCommand(command);
+        
+        if (success) {
+            // UI更新
+            performSearch();
+            renderFloor();
+            return true;
+        }
+        return false;
+    }
+
     // --- 動的色生成システム ---
     
     // 職種・部署カテゴリーに基づく色のベースマッピング
@@ -661,6 +1043,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
         }
         currentFloorId = newFloorId;
+        
+        // アンドゥマネージャーをフロア切り替えに同期
+        syncUndoManagerWithFloor();
+        
         if (!allFloorData[currentFloorId]) {
             allFloorData[currentFloorId] = initializeNewFloorData();
         }
@@ -1011,14 +1397,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const isl = parseInt(cell.dataset.island, 10);
                 const r = parseInt(cell.dataset.row, 10);
                 const c = parseInt(cell.dataset.col, 10);
-                if (seatMap && seatMap[isl] && seatMap[isl][r]) {
-                    seatMap[isl][r][c] = null;
-                    if (allFloorData[currentFloorId] && allFloorData[currentFloorId].seatMap[isl] && allFloorData[currentFloorId].seatMap[isl][r]) {
-                        allFloorData[currentFloorId].seatMap[isl][r][c] = null;
-                    }
+                // アンドゥ対応の移動処理（座席→未配置）
+                const empNo = seatMap[isl][r][c];
+                if (empNo) {
+                    const fromLocation = { 
+                        type: 'seat', 
+                        island: isl, 
+                        row: r, 
+                        col: c 
+                    };
+                    const toLocation = { type: 'unassigned' };
+                    // 座席から未配置への移動として扱う
+                    moveEmployeeToUnassigned(empNo, fromLocation);
                 }
-                performSearch();
-                renderFloor();
             };
         });
     }
@@ -1054,18 +1445,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (selectedEmpNo && seatMap[isl][r][c] === null) {
-            seatMap[isl][r][c] = selectedEmpNo;
-            if (allFloorData[currentFloorId] && allFloorData[currentFloorId].seatMap[isl] && allFloorData[currentFloorId].seatMap[isl][r]) {
-                allFloorData[currentFloorId].seatMap[isl][r][c] = selectedEmpNo;
+            // アンドゥ対応の移動処理（未配置→座席）
+            const fromLocation = { type: 'unassigned' };
+            const success = moveEmployee(selectedEmpNo, fromLocation, isl, r, c);
+            if (success) {
+                // UI状態をクリア
+                employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
+                selectedEmpNo = null;
+                if (selectedCell) {
+                    selectedCell.classList.remove('selected');
+                    selectedCell = null;
+                }
             }
-            employeeListPanel.querySelectorAll('.employee-item.selected').forEach(el => el.classList.remove('selected'));
-            selectedEmpNo = null;
-            if (selectedCell) {
-                selectedCell.classList.remove('selected');
-                selectedCell = null;
-            }
-            performSearch();
-            renderFloor();
             return;
         }
 
@@ -1861,32 +2252,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         const targetSeatCurrentEmpNo = seatMap[targetIsl][targetRow][targetCol];
         let operationSuccess = false;
 
+        // アンドゥ対応の移動処理
         if (origin === 'unassigned') {
             if (targetSeatCurrentEmpNo === null) {
-                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
-                operationSuccess = true;
+                // 未配置から空席へ移動
+                const fromLocation = { type: 'unassigned' };
+                operationSuccess = moveEmployee(draggedEmpNo, fromLocation, targetIsl, targetRow, targetCol);
             } else {
                 showFeedbackMessage("ドロップ先の席は既に使われています。", true);
             }
         } else {
-            if (targetSeatCurrentEmpNo === null) {
-                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
-                seatMap[originIsl][originRow][originCol] = null;
-                operationSuccess = true;
-            } else {
-                seatMap[targetIsl][targetRow][targetCol] = draggedEmpNo;
-                seatMap[originIsl][originRow][originCol] = targetSeatCurrentEmpNo;
-                operationSuccess = true;
-            }
+            // 座席から座席への移動（空席または入れ替え）
+            const fromLocation = { 
+                type: 'seat', 
+                island: originIsl, 
+                row: originRow, 
+                col: originCol 
+            };
+            operationSuccess = moveEmployee(draggedEmpNo, fromLocation, targetIsl, targetRow, targetCol);
         }
 
         if (operationSuccess) {
-            if(allFloorData[currentFloorId]) {
-                allFloorData[currentFloorId].seatMap = JSON.parse(JSON.stringify(seatMap));
-            }
             showFeedbackMessage(`${cardDB[draggedEmpNo]?.name || draggedEmpNo} さんを移動しました。`, false);
-            renderFloor();
-            performSearch();
             deselectAll();
         }
     }
@@ -2446,6 +2833,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                 hideDeptZoneClickDropdown();
             }
         });
+    }
+    
+    // --- グローバルキーボードショートカット ---
+    document.addEventListener('keydown', (e) => {
+        // モーダルが開いている時や入力フィールドにフォーカスがある時はスキップ
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            return;
+        }
+        
+        // モーダルが開いている時はスキップ
+        const deptZoneModal = document.getElementById('deptZoneModal');
+        if (deptZoneModal && deptZoneModal.style.display === 'block') {
+            return;
+        }
+        
+        // 管理モードでのみアンドゥ/リドゥを有効化
+        if (currentAppMode !== 'admin') {
+            return;
+        }
+        
+        // Ctrl+Z: アンドゥ
+        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            if (undoRedoManager.undo()) {
+                const desc = undoRedoManager.getLastCommandDescription();
+                performSearch();
+                renderFloor();
+                showFeedbackMessage(`元に戻しました: ${desc || '操作'}`, false);
+            } else {
+                showFeedbackMessage("元に戻す操作がありません", true);
+            }
+        }
+        
+        // Ctrl+Y または Ctrl+Shift+Z: リドゥ
+        if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
+            e.preventDefault();
+            if (undoRedoManager.redo()) {
+                const desc = undoRedoManager.getNextCommandDescription();
+                performSearch();
+                renderFloor();
+                showFeedbackMessage(`やり直しました: ${desc || '操作'}`, false);
+            } else {
+                showFeedbackMessage("やり直す操作がありません", true);
+            }
+        }
+    });
+    
+    // フロア切り替え時のアンドゥマネージャー同期
+    function syncUndoManagerWithFloor() {
+        if (undoRedoManager) {
+            undoRedoManager.switchFloor(currentFloorId);
+        }
     }
     
     function showDeptZoneClickDropdown(event, rowType, zoneIndex) {
