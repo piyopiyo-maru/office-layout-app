@@ -1790,7 +1790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!isAdminMode && mergeMode) {
                 mergeMode = false;
                 mergeBtn.classList.remove('active');
-                mergeBtn.textContent = '＋';
+                mergeBtn.textContent = '＋席結合/解除';
             }
         }
         if (saveDeptZoneSettingsBtn) saveDeptZoneSettingsBtn.disabled = !isAdminMode;
@@ -2140,7 +2140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             mergeMode = false;
             if (mergeBtn) {
                 mergeBtn.classList.remove('active');
-                mergeBtn.textContent = '＋';
+                mergeBtn.textContent = '＋席結合/解除';
             }
             renderFloor();
         } else if (mergeMode && currentAppMode === 'view') {
@@ -2407,13 +2407,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (currentAppMode === 'view') return;
                 mergeMode = !mergeMode;
                 mergeBtn.classList.toggle('active', mergeMode);
-                mergeBtn.textContent = mergeMode ? '－' : '＋';
+                mergeBtn.textContent = mergeMode ? '－席結合/解除' : '＋席結合/解除';
                 renderFloor();
                 if (mergeMode) {
                     deselectAll();
                     mergeMode = true;
                     mergeBtn.classList.add('active');
-                    mergeBtn.textContent = '－';
+                    mergeBtn.textContent = '－席結合/解除';
                 }
             };
         }

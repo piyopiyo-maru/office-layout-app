@@ -686,21 +686,6 @@
       filter: brightness(90%);
       transform: translateY(-1px);
     }
-    .controls #mergeBtn {
-      background-color: #6c757d;
-      color: white;
-      padding: 0;
-      width: 40px;
-      font-size: 1.5rem;
-      line-height: 40px;
-      text-align: center;
-    }
-    .controls #mergeBtn.active {
-      background: #007bff;
-      color: #fff;
-      border: 2px solid white;
-      box-shadow: none;
-    }
     .controls #toggleListBtn { background-color: #607D8B; }
     .controls #saveLocalBtn { background-color: #FF9800; }
     .controls #loadLocalBtn { background-color: #795548; }
@@ -1230,9 +1215,10 @@
 }
 
 /* --- その他のボタンの色調整 --- */
-/* リスト表示ボタンと部署範囲設定ボタンの幅を調整 */
+/* リスト表示ボタンと部署範囲設定ボタンと席結合ボタンの幅を調整 */
 .controls #toggleListBtn,
-.controls #deptZoneSettingsBtn {
+.controls #deptZoneSettingsBtn,
+.controls #mergeBtn {
   min-width: 130px; /* ★他のテキスト付きボタンと最小幅を合わせる */
   justify-content: flex-start; /* ★アイコンを左寄せ、テキストが続くようにする */
   padding: 0 12px; /* ★共通のパディングを適用 */
@@ -1253,12 +1239,15 @@
 .controls #deptZoneSettingsBtn { background-color: #4CAF50; color: white; border-color: #4CAF50;}
 .controls #deptZoneSettingsBtn:hover:not([disabled]) { background-color: #43A047; border-color: #43A047;}
 
+.controls #mergeBtn { background-color: #6c757d; color: white; border-color: #6c757d;}
+.controls #mergeBtn:hover:not([disabled]) { background-color: #5a6268; border-color: #5a6268;}
+.controls #mergeBtn.active { background-color: #007bff; color: white; border-color: #007bff;}
+
 
 .controls #upBtn,
 .controls #leftBtn,
 .controls #downBtn,
-.controls #rightBtn,
-.controls #mergeBtn {
+.controls #rightBtn {
   min-width: 40px;
   padding: 0; /* パディングを0にし、justify-contentで中央揃え */
   background-color: #9E9E9E;
@@ -1268,23 +1257,16 @@
 .controls #upBtn:hover:not([disabled]),
 .controls #leftBtn:hover:not([disabled]),
 .controls #downBtn:hover:not([disabled]),
-.controls #rightBtn:hover:not([disabled]),
-.controls #mergeBtn:hover:not([disabled]) {
+.controls #rightBtn:hover:not([disabled]) {
   background-color: #757575;
   border-color: #757575;
-}
-.controls #mergeBtn.active {
-  background: #007bff;
-  color: #fff;
-  border-color: #007bff;
 }
 
 /* アイコンのみ、またはアイコンが主要なボタンのアイコンマージン調整 */
 .controls #upBtn i,
 .controls #leftBtn i,
 .controls #downBtn i,
-.controls #rightBtn i,
-.controls #mergeBtn i {
+.controls #rightBtn i {
   margin-right: 0; /* 右マージンを削除して中央揃えを助ける */
 }
 
