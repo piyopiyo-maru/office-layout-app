@@ -18,5 +18,3 @@ docker-compose.override.yml
 # 設定など環境依存ファイル
 *.ini
 
-# 社員情報
-*.json

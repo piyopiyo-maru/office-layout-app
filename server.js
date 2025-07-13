@@ -63,13 +63,72 @@ async function createBackup(filePath) {
 // ▲▲▲ 変更箇所 ▲▲▲
 
 // Helper Functions
+
+
+// レイアウトデータから存在しない社員番号を削除し、nullに置換
+async function cleanupLayoutData(employeeData) {
+    try {
+        const layoutData = await getLayoutData();
+        let layoutModified = false;
+        
+        if (!layoutData || !layoutData.layout) {
+            return;
+        }
+        
+        for (const floorId in layoutData.layout) {
+            const floor = layoutData.layout[floorId];
+            if (floor && floor.seatMap && Array.isArray(floor.seatMap)) {
+                floor.seatMap.forEach((row, rowIndex) => {
+                    if (Array.isArray(row)) {
+                        row.forEach((island, islandIndex) => {
+                            if (Array.isArray(island)) {
+                                island.forEach((seat, seatIndex) => {
+                                    if (seat && typeof seat === 'string' && seat !== 'null') {
+                                        // 社員データに存在しない社員番号は null に置換
+                                        if (!employeeData[seat]) {
+                                            console.log(`Cleaning up seat: Floor ${floorId}, empNo ${seat} -> null`);
+                                            floor.seatMap[rowIndex][islandIndex][seatIndex] = null;
+                                            layoutModified = true;
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        }
+        
+        // レイアウトデータが修正された場合は保存
+        if (layoutModified) {
+            await saveLayoutData(layoutData);
+            console.log('Layout data automatically cleaned up and saved');
+        }
+        
+    } catch (error) {
+        console.warn('Could not cleanup layout data:', error);
+    }
+}
+
 async function getInitialData() {
     try {
+        let data = { employeeData: {}, teamColors: {}, departmentColors: {} };
+        
+        // 社員マスターデータを読み込み
         if (await fs.pathExists(INITIAL_DATA_PATH)) {
-            return await fs.readJson(INITIAL_DATA_PATH);
+            data = await fs.readJson(INITIAL_DATA_PATH);
+        } else {
+            console.warn(`${INITIAL_DATA_PATH} not found.`);
         }
-        console.warn(`${INITIAL_DATA_PATH} not found.`);
-        return { employeeData: {}, teamColors: {}, departmentColors: {} };
+        
+        // レイアウトデータの整合性をチェックし、存在しない社員番号をnullに置換
+        try {
+            await cleanupLayoutData(data.employeeData);
+        } catch (layoutError) {
+            console.warn('Could not cleanup layout data:', layoutError);
+        }
+        
+        return data;
     } catch (error) {
         console.error('Error reading initial data:', error);
         throw error;
