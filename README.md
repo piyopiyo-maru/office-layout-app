@@ -108,7 +108,7 @@ docker build -t office-layout-app .
 
 # コンテナ起動
 docker run -d -p 9000:9000 \
-  -v /opt/office-layout-app/data:/usr/src/app/data \
+  -v $(pwd)/data:/usr/src/app/data \
   --name office-layout-container \
   office-layout-app
 ```
