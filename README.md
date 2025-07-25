@@ -123,8 +123,8 @@ npm start
 ```
 
 ### 接続確認
-- **アプリケーション**: http://localhost:9000
-- **操作マニュアル**: http://localhost:9000/manual.html
+- **アプリケーション**: https://layout.callstatus.online
+- **操作マニュアル**: https://layout.callstatus.online/manual.html
 
 ---
 
