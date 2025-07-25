@@ -100,7 +100,7 @@
 ### Docker起動（推奨）
 ```bash
 # リポジトリクローン
-git clone https://github.com/piyopiyo-maru/office-layout-app.git
+git clone https://github.com/piyo-maru/office-layout-app.git
 cd office-layout-app
 
 # Dockerイメージビルド
@@ -384,7 +384,7 @@ ISC License - 詳細は[LICENSE](LICENSE)をご覧ください。
 ## 👤 開発者情報
 
 **Atsushi Machida**
-- GitHub: [@piyopiyo-maru](https://github.com/piyopiyo-maru)
+- GitHub: [@piyo-maru](https://github.com/piyo-maru)
 
 ### 💼 転職活動について
 このプロジェクトは実用的なオフィス管理要件に基づいた開発経験を示すポートフォリオです。  
